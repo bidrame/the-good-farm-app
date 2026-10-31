@@ -1,3 +1,4 @@
+import { IconAlertOctagon, IconAlertTriangle, IconInfoCircle } from '@tabler/icons-react'
 import { useState, type ReactNode } from 'react'
 import { formatFCFA, parseMontant } from '../../lib/format'
 import type { Alerte as TAlerte } from '../../lib/calculs/alertes'
@@ -17,8 +18,16 @@ export function CarteMetrique({ libelle, valeur, variation, hausseMauvaise = fal
   )
 }
 
+const ICONE_ALERTE = { danger: IconAlertOctagon, attention: IconAlertTriangle, info: IconInfoCircle }
+
 export function Alerte({ alerte }: { alerte: TAlerte }) {
-  return <div className={`alerte ${alerte.niveau}`} role="status">{alerte.message}</div>
+  const Icone = ICONE_ALERTE[alerte.niveau]
+  return (
+    <div className={`alerte ${alerte.niveau}`} role="status">
+      <Icone size={18} aria-hidden="true" />
+      <span>{alerte.message}</span>
+    </div>
+  )
 }
 
 export function Confirmation({ message, onOui, onNon, oui = 'Confirmer', non = 'Annuler' }: { message: ReactNode; onOui: () => void; onNon: () => void; oui?: string; non?: string }) {

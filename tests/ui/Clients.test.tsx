@@ -44,8 +44,14 @@ describe('Clients et crédits', () => {
     await u.click(screen.getByRole('button', { name: 'Enregistrer un paiement' }))
     await u.type(screen.getByLabelText('Montant'), '10000')
     await u.selectOptions(screen.getByLabelText('Mode'), 'wave')
-    await u.click(screen.getByRole('button', { name: 'Valider le paiement' }))
+    await u.click(screen.getByRole('button', { name: 'Continuer' }))
+    const recap = screen.getByRole('region', { name: 'Récapitulatif' })
+    expect(esp(recap.textContent)).toContain('Wave')
+    expect(esp(recap.textContent)).toContain('Nouveau solde1 000 F')
+    expect(enregistrer).not.toHaveBeenCalled()
+    await u.click(within(recap).getByRole('button', { name: 'Valider' }))
     expect(enregistrer).toHaveBeenCalledWith('paiements', expect.objectContaining({ client_id: 'c-dame', montant: 10000, mode: 'wave' }))
+    expect(screen.getByText('Paiement enregistré')).toBeInTheDocument()
   })
 
   it('propose un rappel WhatsApp avec le solde', () => {
@@ -57,7 +63,7 @@ describe('Clients et crédits', () => {
   it('refuse un paiement vide', async () => {
     const { u, enregistrer } = afficher('/clients/c-dame')
     await u.click(screen.getByRole('button', { name: 'Enregistrer un paiement' }))
-    await u.click(screen.getByRole('button', { name: 'Valider le paiement' }))
+    await u.click(screen.getByRole('button', { name: 'Continuer' }))
     expect(screen.getByText('Montant obligatoire')).toBeInTheDocument()
     expect(enregistrer).not.toHaveBeenCalled()
   })
@@ -74,8 +80,19 @@ describe('Paiement : robustesse', () => {
     const u = userEvent.setup()
     await u.click(screen.getByRole('button', { name: 'Enregistrer un paiement' }))
     await u.type(screen.getByLabelText('Montant'), '1000')
-    await u.click(screen.getByRole('button', { name: /Valider le paiement|Enregistrement/ }))
-    await u.click(screen.getByRole('button', { name: /Valider le paiement|Enregistrement/ }))
+    await u.click(screen.getByRole('button', { name: 'Continuer' }))
+    await u.click(screen.getByRole('button', { name: /^Valider$|Enregistrement/ }))
+    await u.click(screen.getByRole('button', { name: /^Valider$|Enregistrement/ }))
     expect(enregistrer).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Paiement plus grand que la dette', () => {
+  it('prévient que le client sera en avance', async () => {
+    const { u } = afficher('/clients/c-dame')
+    await u.click(screen.getByRole('button', { name: 'Enregistrer un paiement' }))
+    await u.type(screen.getByLabelText('Montant'), '15000')
+    await u.click(screen.getByRole('button', { name: 'Continuer' }))
+    expect(esp(screen.getByRole('region', { name: 'Récapitulatif' }).textContent)).toContain('Avance de 4 000 F')
   })
 })

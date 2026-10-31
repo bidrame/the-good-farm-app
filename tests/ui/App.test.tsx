@@ -16,7 +16,7 @@ describe('Coquille', () => {
         <Coquille session={{ user: { id: 'u1' } }} sansDonnees />
       </DonneesFixes>,
     )
-    const nav = screen.getByRole('navigation')
+    const nav = screen.getByRole('navigation', { name: 'Navigation principale' })
     for (const libelle of ['Accueil', 'Saisir', 'Ponte', 'Bandes', 'Plus']) expect(nav).toHaveTextContent(libelle)
   })
 })

@@ -33,9 +33,11 @@ export function soldesClients(clients: Client[], txs: Transaction[], paiements: 
     .sort((a, b) => b.solde - a.solde)
 }
 
-export function dernierPrix(txs: Transaction[], clientId: string | null, produitId: string): number | null {
+/** `oeufsParUnite` : pour les œufs, ne regarde que les ventes du même conditionnement (absent = plateau de 30). */
+export function dernierPrix(txs: Transaction[], clientId: string | null, produitId: string, oeufsParUnite?: number): number | null {
   const t = txs
     .filter((t) => !t.supprime_le && t.client_id === clientId && t.produit_id === produitId)
+    .filter((t) => oeufsParUnite == null || (t.oeufs_par_unite ?? 30) === oeufsParUnite)
     .reduce<Transaction | null>((m, t) => (!m || t.date >= m.date ? t : m), null)
   return t ? t.prix_unitaire : null
 }

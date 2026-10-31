@@ -25,6 +25,8 @@ describe('construireClasseur', () => {
     expect(depense.Montant).toBe(-60000)
     expect(depense.Produit).toBe('Aliment pondeuse')
     expect(rows.find((r) => r.Client === 'Dame' && r.Produit === 'Œufs')!.Reste).toBe(11000)
+    expect(rows.find((r) => r.Client === 'Dame' && r.Produit === 'Œufs')!['Œufs par unité']).toBe(30)
+    expect(depense['Œufs par unité']).toBeUndefined()
   })
   it('écrit de vraies dates Excel', () => {
     const ws = relu(construireClasseur(donnees(), '2026-10-31')).Sheets.Transactions

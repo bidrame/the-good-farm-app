@@ -5,7 +5,9 @@ import { soldeClient } from '../../lib/calculs/credits'
 import { aujourdhui, formatDate, formatFCFA } from '../../lib/format'
 import type { ModePaiement } from '../../lib/types'
 import { lienRappel } from '../../lib/whatsapp'
+import { vibrer } from '../composants/animations'
 import { ChampMontant } from '../composants/communs'
+import { Recapitulatif, Reussite } from '../composants/Recapitulatif'
 
 export const MODES: [ModePaiement, string][] = [
   ['especes', 'Espèces'], ['wave', 'Wave'], ['orange_money', 'Orange Money'], ['virement', 'Virement'], ['autre', 'Autre'],
@@ -13,17 +15,51 @@ export const MODES: [ModePaiement, string][] = [
 
 const NB_HISTORIQUE = 30
 
-function FormulairePaiement({ clientId, onFini }: { clientId: string; onFini: () => void }) {
+function FormulairePaiement({ clientId, soldeActuel, onFini }: { clientId: string; soldeActuel: number; onFini: () => void }) {
   const { enregistrer } = useDonnees()
   const [montant, setMontant] = useState<number | null>(null)
   const [mode, setMode] = useState<ModePaiement>('especes')
   const [date, setDate] = useState(aujourdhui())
   const [erreur, setErreur] = useState<string | null>(null)
+  const [etape, setEtape] = useState<'formulaire' | 'recap' | 'fait'>('formulaire')
   const [enCours, setEnCours] = useState(false)
   const [id] = useState(() => crypto.randomUUID())
+  const nouveauSolde = soldeActuel - (montant ?? 0)
+
+  async function valider() {
+    if (enCours) return
+    setEnCours(true)
+    try {
+      await enregistrer('paiements', { id, client_id: clientId, montant, mode, date })
+      vibrer()
+      setEtape('fait')
+    } finally {
+      setEnCours(false)
+    }
+  }
+
+  if (etape === 'fait')
+    return <Reussite message="Paiement enregistré" detail={`${formatFCFA(montant ?? 0)} reçus`} action="Fermer" onAction={onFini} />
+
+  if (etape === 'recap')
+    return (
+      <Recapitulatif
+        titre="Vérifiez le paiement"
+        lignes={[
+          ['Date', formatDate(date)],
+          ['Mode', MODES.find((m) => m[0] === mode)?.[1] ?? mode],
+          ['Nouveau solde', nouveauSolde >= 0 ? formatFCFA(nouveauSolde) : `Avance de ${formatFCFA(-nouveauSolde)}`],
+        ]}
+        total={['Montant reçu', formatFCFA(montant ?? 0)]}
+        onModifier={() => setEtape('formulaire')}
+        onValider={valider}
+        enCours={enCours}
+      />
+    )
+
   return (
     <div className="carte">
-      <ChampMontant libelle="Montant" valeur={montant} onChange={setMontant} erreur={erreur ?? undefined} />
+      <ChampMontant libelle="Montant" valeur={montant} onChange={(v) => { setMontant(v); setErreur(null) }} erreur={erreur ?? undefined} />
       <label>
         Mode
         <select value={mode} onChange={(e) => setMode(e.target.value as ModePaiement)}>
@@ -31,18 +67,10 @@ function FormulairePaiement({ clientId, onFini }: { clientId: string; onFini: ()
         </select>
       </label>
       <label>Date<input type="date" value={date} max={aujourdhui()} onChange={(e) => setDate(e.target.value)} /></label>
-      <button className="principal" disabled={enCours} onClick={async () => {
-        if (enCours) return
+      <button className="principal" onClick={() => {
         if (!montant || montant <= 0) return setErreur('Montant obligatoire')
-        setErreur(null)
-        setEnCours(true)
-        try {
-          await enregistrer('paiements', { id, client_id: clientId, montant, mode, date })
-          onFini()
-        } finally {
-          setEnCours(false)
-        }
-      }}>{enCours ? 'Enregistrement…' : 'Valider le paiement'}</button>
+        setEtape('recap')
+      }}>Continuer</button>
     </div>
   )
 }
@@ -68,12 +96,12 @@ export function ClientFiche() {
       <Link to="/clients" className="discret">← Clients</Link>
       <h1>{c.nom}</h1>
       <div className="grille2" style={{ marginBottom: 10 }}>
-        <div className="metrique"><div className="discret">Solde</div><div className={`valeur ${solde > 0 ? 'mauvais' : 'ok'}`} data-testid="solde">{formatFCFA(solde)}</div></div>
+        <div className="metrique"><div className="discret">Solde</div><div className={`valeur ${solde > 0 ? 'mauvais' : 'ok'}`} data-testid="solde">{solde >= 0 ? formatFCFA(solde) : `Avance ${formatFCFA(-solde)}`}</div></div>
         <div className="metrique"><div className="discret">Chiffre d’affaires</div><div className="valeur">{formatFCFA(ca)}</div></div>
       </div>
 
       <button onClick={() => setPaiement((p) => !p)} style={{ width: '100%', marginBottom: 8 }}>Enregistrer un paiement</button>
-      {paiement && <FormulairePaiement clientId={c.id} onFini={() => setPaiement(false)} />}
+      {paiement && <FormulairePaiement clientId={c.id} soldeActuel={solde} onFini={() => setPaiement(false)} />}
       {solde > 0 && (
         <a className="carte" style={{ display: 'block', textAlign: 'center', color: 'var(--vert)', fontWeight: 600 }} href={lienRappel(c.nom, solde, c.telephone)} target="_blank" rel="noreferrer">
           Rappel WhatsApp

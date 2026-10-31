@@ -64,4 +64,10 @@ describe('dernierPrix', () => {
     expect(dernierPrix(txs, 'c1', 'p-oeufs')).toBe(2600)
     expect(dernierPrix(txs, 'c3', 'p-oeufs')).toBeNull()
   })
+  it('distingue le prix d’un plateau de 30 et d’une boîte de 12', () => {
+    const txs = [tx({ date: '2026-10-01', prix_unitaire: 2300 }), tx({ date: '2026-10-02', prix_unitaire: 1000, oeufs_par_unite: 12 })]
+    expect(dernierPrix(txs, 'c1', 'p-oeufs', 30)).toBe(2300)
+    expect(dernierPrix(txs, 'c1', 'p-oeufs', 12)).toBe(1000)
+    expect(dernierPrix(txs, 'c1', 'p-oeufs', 6)).toBeNull()
+  })
 })

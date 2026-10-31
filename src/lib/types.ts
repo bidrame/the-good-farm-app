@@ -38,6 +38,8 @@ export interface Transaction extends Audit {
   quantite: number
   montant: number
   montant_paye: number
+  /** Ventes d'œufs : nombre d'œufs par unité vendue (30 = plateau). Absent = 30. */
+  oeufs_par_unite?: number | null
   observation?: string | null
 }
 
@@ -88,8 +90,21 @@ export interface Seuils {
   jours_sauvegarde: number
 }
 
+export interface Conditionnement {
+  nom: string
+  oeufs: number
+}
+
+/** Inventaire de départ du stock d'œufs : compté le jour `date` (ponte et ventes de ce jour incluses). */
+export interface StockDepart {
+  date: DateISO
+  oeufs: number
+}
+
 export interface Reglages {
   courbe_attendue?: [number, number][] | null
   derniere_sauvegarde?: DateISO | null
   seuils?: Partial<Seuils> | null
+  conditionnements?: Conditionnement[] | null
+  stock_depart?: StockDepart | null
 }

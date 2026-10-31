@@ -136,3 +136,25 @@ describe('Réglages : unités et seuils', () => {
     expect(enregistrer).toHaveBeenCalledWith('reglages', { id: 1, seuils: { baisse_points: 8, mortalite_pour_mille: 5, jours_sauvegarde: 7 } })
   })
 })
+
+describe('Réglages : conditionnements et inventaire', () => {
+  it('ajoute un conditionnement aux conditionnements habituels', async () => {
+    const { u, enregistrer } = afficher(<Reglages />)
+    const zone = screen.getByRole('region', { name: 'Conditionnements des œufs' })
+    expect(zone).toHaveTextContent('Plateau de 30')
+    await u.type(within(zone).getByLabelText('Nom'), 'Plateau de 20')
+    await u.type(within(zone).getByLabelText('Œufs'), '20')
+    await u.click(within(zone).getByRole('button', { name: 'Ajouter' }))
+    expect(enregistrer).toHaveBeenCalledWith('reglages', expect.objectContaining({
+      id: 1, conditionnements: expect.arrayContaining([{ nom: 'Plateau de 30', oeufs: 30 }, { nom: 'Plateau de 20', oeufs: 20 }]),
+    }))
+  })
+  it('enregistre l’inventaire du stock d’œufs du jour', async () => {
+    const { u, enregistrer } = afficher(<Reglages />)
+    const zone = screen.getByRole('region', { name: 'Inventaire des œufs' })
+    await u.type(within(zone).getByLabelText('Plateaux de 30'), '27')
+    await u.type(within(zone).getByLabelText('+ œufs'), '10')
+    await u.click(within(zone).getByRole('button', { name: 'Enregistrer l’inventaire' }))
+    expect(enregistrer).toHaveBeenCalledWith('reglages', { id: 1, stock_depart: { date: '2026-10-31', oeufs: 820 } })
+  })
+})

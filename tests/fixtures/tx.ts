@@ -17,4 +17,4 @@ export const paiement = (p: Partial<Paiement>): Paiement => ({
 
 export const client = (id: string, nom: string): Client => ({ id, nom })
 
-export const produit = (id: string, nom: string, type: Produit['type'] = 'vente'): Produit => ({ id, nom, type, unite: 'plaque', actif: true })
+export const produit = (id: string, nom: string, type: Produit['type'] = 'vente'): Produit => ({ id, nom, type, unite: nom === 'Œufs' ? 'plaque' : 'unite', actif: true })

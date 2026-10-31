@@ -2,8 +2,11 @@ import { useState } from 'react'
 import { seDeconnecter } from '../../data/auth'
 import { useDonnees } from '../../data/useDonnees'
 import { SEUILS_DEFAUT } from '../../lib/calculs/alertes'
+import { CONDITIONNEMENTS_DEFAUT, OEUFS_PAR_PLATEAU, enOeufs } from '../../lib/calculs/oeufs'
 import { COURBE_DEFAUT } from '../../lib/calculs/ponte'
-import type { Seuils } from '../../lib/types'
+import { aujourdhui, formatDate } from '../../lib/format'
+import { ChampMontant } from '../composants/communs'
+import type { Conditionnement, Seuils } from '../../lib/types'
 import type { TypeTx, Unite } from '../../lib/types'
 
 const UNITES: [Unite, string][] = [['plaque', 'Plaque de 30'], ['unite', 'Unité'], ['kg', 'Kg'], ['forfait', 'Forfait'], ['autre', 'Autre']]
@@ -128,10 +131,73 @@ function SeuilsAlerte() {
   )
 }
 
+function Conditionnements() {
+  const { reglages, enregistrer } = useDonnees()
+  const liste: Conditionnement[] = reglages[0]?.conditionnements?.length ? reglages[0].conditionnements : CONDITIONNEMENTS_DEFAUT
+  const [nom, setNom] = useState('')
+  const [oeufs, setOeufs] = useState<number | null>(null)
+  const [erreur, setErreur] = useState<string | null>(null)
+  const sauver = (l: Conditionnement[]) => enregistrer('reglages', { id: 1, conditionnements: l })
+  return (
+    <section className="carte" aria-label="Conditionnements des œufs">
+      <h2 style={{ marginTop: 0 }}>Conditionnements des œufs</h2>
+      {liste.map((c) => (
+        <div className="ligne" key={c.oeufs}>
+          <span>{c.nom} <span className="discret">· {c.oeufs} œufs</span></span>
+          {c.oeufs !== OEUFS_PAR_PLATEAU && (
+            <button className="lien" aria-label={`Retirer ${c.nom}`} onClick={() => sauver(liste.filter((x) => x.oeufs !== c.oeufs))}>Retirer</button>
+          )}
+        </div>
+      ))}
+      <div className="grille2" style={{ marginTop: 8 }}>
+        <label>Nom<input value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Plateau de 20" /></label>
+        <ChampMontant libelle="Œufs" valeur={oeufs} onChange={setOeufs} />
+      </div>
+      {erreur && <div className="erreur">{erreur}</div>}
+      <button onClick={async () => {
+        if (!nom.trim() || !oeufs || oeufs <= 0) return setErreur('Nom et nombre d’œufs obligatoires.')
+        if (liste.some((c) => c.oeufs === oeufs)) return setErreur('Ce nombre d’œufs existe déjà.')
+        setErreur(null)
+        await sauver([...liste, { nom: nom.trim(), oeufs }].sort((a, b) => (a.oeufs === OEUFS_PAR_PLATEAU ? -1 : b.oeufs === OEUFS_PAR_PLATEAU ? 1 : b.oeufs - a.oeufs)))
+        setNom('')
+        setOeufs(null)
+      }}>Ajouter</button>
+    </section>
+  )
+}
+
+function Inventaire() {
+  const { reglages, enregistrer } = useDonnees()
+  const depart = reglages[0]?.stock_depart
+  const [plateaux, setPlateaux] = useState<number | null>(null)
+  const [restants, setRestants] = useState<number | null>(null)
+  const [fait, setFait] = useState(false)
+  return (
+    <section className="carte" aria-label="Inventaire des œufs">
+      <h2 style={{ marginTop: 0 }}>Inventaire des œufs</h2>
+      <p className="discret" style={{ marginTop: 0 }}>
+        Comptez les œufs en stock ce soir : l’appli suivra ensuite le stock toute seule (ponte − pertes − ventes).
+        {depart && ` Dernier inventaire : ${depart.oeufs} œufs le ${formatDate(depart.date)}.`}
+      </p>
+      <div className="grille2">
+        <ChampMontant libelle="Plateaux de 30" valeur={plateaux} onChange={(v) => { setPlateaux(v); setFait(false) }} />
+        <ChampMontant libelle="+ œufs" valeur={restants} onChange={(v) => { setRestants(v); setFait(false) }} />
+      </div>
+      <button className="principal" onClick={async () => {
+        await enregistrer('reglages', { id: 1, stock_depart: { date: aujourdhui(), oeufs: enOeufs(plateaux ?? 0, OEUFS_PAR_PLATEAU, restants ?? 0) } })
+        setFait(true)
+      }}>Enregistrer l’inventaire</button>
+      {fait && <p className="ok">Inventaire enregistré ✓</p>}
+    </section>
+  )
+}
+
 export function Reglages() {
   return (
     <main>
       <h1>Réglages</h1>
+      <Inventaire />
+      <Conditionnements />
       <Courbe />
       <SeuilsAlerte />
       <Produits />

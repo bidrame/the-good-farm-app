@@ -38,6 +38,13 @@ describe('Rapports', () => {
     expect(lignes('Classement des clients')[0]).toMatch(/^Ass/)
     expect(lignes('Bilan par année').map((l) => l.slice(0, 4))).toEqual(['2025', '2026'])
   })
+  it('résume les œufs vendus en plateaux et prix moyen du plateau', () => {
+    afficher()
+    const zone = screen.getByRole('region', { name: 'Œufs vendus' })
+    expect(esp(zone.textContent)).toContain('750 œufs')
+    expect(esp(zone.textContent)).toContain('25 plateaux')
+    expect(esp(zone.textContent)).toContain('2 400 F')
+  })
   it('détaille les dépenses par poste', () => {
     afficher()
     expect(lignes('Dépenses par poste')[0]).toMatch(/^Aliment pondeuse.*60 000 F/)

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useDonnees } from '../../data/useDonnees'
 import { bilanAnnuel, bilanMensuel, classementClients, parProduit } from '../../lib/calculs/bilans'
+import { statsVentesOeufs } from '../../lib/calculs/oeufs'
 import { aujourdhui, formatFCFA } from '../../lib/format'
 import { couleur } from '../couleurs'
 
@@ -33,6 +34,7 @@ export function Rapports() {
   const mensuel = bilanMensuel(txs)
   const ventes = parProduit(txs, produits, 'vente')
   const depenses = parProduit(txs, produits, 'depense')
+  const oeufs = statsVentesOeufs(txs, produits)
 
   return (
     <main>
@@ -66,6 +68,12 @@ export function Rapports() {
         <Tableau titre="Bilan par année" entetes={['Année', 'Ventes', 'Dépenses', 'Résultat', 'Marge']}
           lignes={bilanAnnuel(txs).map((l) => [l.periode, formatFCFA(l.ventes), formatFCFA(l.depenses), formatFCFA(l.resultat), l.ventes ? pct(l.resultat / l.ventes) : '—'])} />
       )}
+      <section aria-label="Œufs vendus" className="carte">
+        <h2 style={{ marginTop: 0 }}>Œufs vendus</h2>
+        <div className="ligne"><span className="discret">Œufs</span><strong>{oeufs.oeufs.toLocaleString('fr-FR')} œufs</strong></div>
+        <div className="ligne"><span className="discret">En plateaux de 30</span><strong>{Math.round(oeufs.plateaux).toLocaleString('fr-FR')} plateaux</strong></div>
+        <div className="ligne"><span className="discret">Prix moyen du plateau</span><strong>{oeufs.prixMoyenPlateau == null ? '—' : formatFCFA(oeufs.prixMoyenPlateau)}</strong></div>
+      </section>
       <Tableau titre="Ventes par produit" entetes={['Produit', 'Quantité', 'Montant', 'Part']}
         lignes={ventes.map((l) => [l.produit.nom, l.quantite, formatFCFA(l.montant), pct(l.part)])} />
       <Tableau titre="Classement des clients" entetes={['Client', 'Achats', 'CA', 'Part']}

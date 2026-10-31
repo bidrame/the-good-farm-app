@@ -3,6 +3,7 @@ import type { Donnees } from '../data/useDonnees'
 import { LIBELLE_PHASE, ageSemaines, effectifActuel, effectifPresent, phase } from '../lib/calculs/bandes'
 import { bilanMensuel } from '../lib/calculs/bilans'
 import { soldesClients } from '../lib/calculs/credits'
+import { OEUFS_PAR_PLATEAU, estProduitOeufs } from '../lib/calculs/oeufs'
 import { tauxPonte } from '../lib/calculs/ponte'
 import type { DateISO } from '../lib/types'
 
@@ -38,12 +39,13 @@ export function construireClasseur(d: Donnees, ref: DateISO): XLSX.WorkBook {
     Produit: nom(d.produits, t.produit_id),
     'Prix unitaire': t.prix_unitaire,
     Quantité: t.quantite,
+    'Œufs par unité': t.type === 'vente' && estProduitOeufs(d.produits.find((p) => p.id === t.produit_id)) ? t.oeufs_par_unite ?? OEUFS_PAR_PLATEAU : null,
     Montant: t.type === 'vente' ? t.montant : -t.montant,
     'Montant payé': t.type === 'vente' ? t.montant_paye : null,
     Reste: t.type === 'vente' ? t.montant - t.montant_paye : null,
     Observation: t.observation ?? '',
     'Saisi par': auteur(t.cree_par),
-  })), ['Date', 'Type', 'Client', 'Produit', 'Prix unitaire', 'Quantité', 'Montant', 'Montant payé', 'Reste', 'Observation', 'Saisi par']), 'Transactions')
+  })), ['Date', 'Type', 'Client', 'Produit', 'Prix unitaire', 'Quantité', 'Œufs par unité', 'Montant', 'Montant payé', 'Reste', 'Observation', 'Saisi par']), 'Transactions')
 
   XLSX.utils.book_append_sheet(wb, feuille(d.paiements.filter((p) => !p.supprime_le).sort((a, b) => b.date.localeCompare(a.date)).map((p) => ({
     Date: dateExcel(p.date), Client: nom(d.clients, p.client_id), Montant: p.montant, Mode: p.mode, Observation: p.observation ?? '',
