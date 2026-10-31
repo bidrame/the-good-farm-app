@@ -30,12 +30,12 @@ export function BoutonsProduits({ produits, transactions, type, valeur, onChange
           {frequents.map((p) => (
             <button type="button" key={p.id} className={p.id === valeur ? 'choisi' : ''} onClick={() => onChange(p.id)}>{p.nom}</button>
           ))}
-          <button type="button" className={choisiAilleurs ? 'choisi' : ''} onClick={() => onChange('')}>Autre…</button>
+          <button type="button" className={choisiAilleurs ? 'choisi' : ''} onClick={() => onChange('')}>Plus de choix…</button>
         </div>
       </div>
       {(valeur === '' || choisiAilleurs) && (
         <label style={{ marginTop: 8 }}>
-          Autre produit
+          Autres choix
           <select value={valeur ?? ''} onChange={(e) => onChange(e.target.value)}>
             <option value="">Choisir…</option>
             {autres.map((p) => <option key={p.id} value={p.id}>{p.nom}</option>)}

@@ -69,12 +69,18 @@ export function Saisir() {
   function prixPropose(clientId: string | null, produitId: string | null, taille: number) {
     if (!produitId) return null
     const pourOeufs = estProduitOeufs(produits.find((p) => p.id === produitId)) ? taille : undefined
-    return dernierPrix(transactions, clientId, produitId, pourOeufs) ?? dernierPrixProduit(produitId, pourOeufs)
+    return (clientId ? dernierPrix(transactions, clientId, produitId, pourOeufs) : null) ?? prixHabituel(produitId, pourOeufs)
   }
-  function dernierPrixProduit(produitId: string, taille?: number) {
-    return transactions
+  /** Sans prix connu pour ce client, le dernier prix du produit, seulement s'il est stable (± 20 % sur les 5 dernières saisies) :
+   *  pour « Autres » ou « Salaires », dont les montants n'ont rien à voir d'une fois sur l'autre, on ne propose rien. */
+  function prixHabituel(produitId: string, taille?: number) {
+    const prix = transactions
       .filter((t) => t.produit_id === produitId && !t.supprime_le && (taille == null || (t.oeufs_par_unite ?? OEUFS_PAR_PLATEAU) === taille))
-      .sort((a, b) => b.date.localeCompare(a.date))[0]?.prix_unitaire ?? null
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 5)
+      .map((t) => t.prix_unitaire)
+    if (!prix.length || Math.max(...prix) > Math.min(...prix) * 1.2) return null
+    return prix[0]
   }
 
   const choisirClient = (id: string | null) =>

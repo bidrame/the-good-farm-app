@@ -134,11 +134,11 @@ describe('Saisir une vente', () => {
     expect(enregistrer).not.toHaveBeenCalled()
   })
 
-  it('montre les 4 produits les plus vendus et « Autre… »', () => {
+  it('montre les 4 produits les plus vendus et « Plus de choix… »', () => {
     afficher()
     const zone = screen.getByRole('group', { name: 'Produit' })
     const noms = within(zone).getAllByRole('button').map((b) => b.textContent)
-    expect(noms).toEqual(['Œufs', 'Poulets congelés', 'Poulets frais', 'Poulets sur pieds', 'Autre…']) // égalité : ordre alphabétique
+    expect(noms).toEqual(['Œufs', 'Poulets congelés', 'Poulets frais', 'Poulets sur pieds', 'Plus de choix…']) // égalité : ordre alphabétique
   })
 
   it('garde la saisie en cours si l’écran est rechargé', async () => {
@@ -167,6 +167,18 @@ describe('Saisir une dépense', () => {
     await valider(u)
     expect(enregistrer).toHaveBeenCalledWith('transactions', expect.objectContaining({ type: 'depense', client_id: null, montant: 60000, montant_paye: 60000, oeufs_par_unite: null }))
     expect(screen.getByText('Dépense enregistrée')).toBeInTheDocument()
+  })
+
+  it('ne propose pas de prix pour une rubrique aux montants variables (salaires, autres)', async () => {
+    const d = ferme()
+    d.transactions!.push(
+      tx({ id: 's1', date: '2026-10-25', type: 'depense', client_id: null, produit_id: 'p-sal', prix_unitaire: 800000, quantite: 1 }),
+      tx({ id: 's2', date: '2026-10-20', type: 'depense', client_id: null, produit_id: 'p-sal', prix_unitaire: 85000, quantite: 1 }),
+    )
+    const { u } = afficher({}, d)
+    await u.click(screen.getByRole('button', { name: 'Dépense' }))
+    await u.click(screen.getByRole('button', { name: 'Salaires' }))
+    expect(screen.getByLabelText(/Prix/)).toHaveValue('')
   })
 
   it('exige le fournisseur pour une dépense à payer plus tard', async () => {
