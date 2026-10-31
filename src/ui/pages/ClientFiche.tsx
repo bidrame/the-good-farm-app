@@ -1,0 +1,102 @@
+import { useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
+import { useDonnees } from '../../data/useDonnees'
+import { soldeClient } from '../../lib/calculs/credits'
+import { aujourdhui, formatDate, formatFCFA } from '../../lib/format'
+import type { ModePaiement } from '../../lib/types'
+import { lienRappel } from '../../lib/whatsapp'
+import { ChampMontant } from '../composants/communs'
+
+export const MODES: [ModePaiement, string][] = [
+  ['especes', 'Espèces'], ['wave', 'Wave'], ['orange_money', 'Orange Money'], ['virement', 'Virement'], ['autre', 'Autre'],
+]
+
+const NB_HISTORIQUE = 30
+
+function FormulairePaiement({ clientId, onFini }: { clientId: string; onFini: () => void }) {
+  const { enregistrer } = useDonnees()
+  const [montant, setMontant] = useState<number | null>(null)
+  const [mode, setMode] = useState<ModePaiement>('especes')
+  const [date, setDate] = useState(aujourdhui())
+  const [erreur, setErreur] = useState<string | null>(null)
+  const [enCours, setEnCours] = useState(false)
+  const [id] = useState(() => crypto.randomUUID())
+  return (
+    <div className="carte">
+      <ChampMontant libelle="Montant" valeur={montant} onChange={setMontant} erreur={erreur ?? undefined} />
+      <label>
+        Mode
+        <select value={mode} onChange={(e) => setMode(e.target.value as ModePaiement)}>
+          {MODES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+      </label>
+      <label>Date<input type="date" value={date} max={aujourdhui()} onChange={(e) => setDate(e.target.value)} /></label>
+      <button className="principal" disabled={enCours} onClick={async () => {
+        if (enCours) return
+        if (!montant || montant <= 0) return setErreur('Montant obligatoire')
+        setErreur(null)
+        setEnCours(true)
+        try {
+          await enregistrer('paiements', { id, client_id: clientId, montant, mode, date })
+          onFini()
+        } finally {
+          setEnCours(false)
+        }
+      }}>{enCours ? 'Enregistrement…' : 'Valider le paiement'}</button>
+    </div>
+  )
+}
+
+export function ClientFiche() {
+  const { id } = useParams()
+  const { clients, transactions, paiements, produits, enregistrer } = useDonnees()
+  const [paiement, setPaiement] = useState(false)
+  const c = clients.find((x) => x.id === id)
+  if (!c) return <main><p>Client introuvable.</p><Link to="/clients">Retour</Link></main>
+
+  const solde = soldeClient(c.id, transactions, paiements)
+  const ventes = transactions.filter((t) => t.client_id === c.id && t.type === 'vente' && !t.supprime_le)
+  const ca = ventes.reduce((s, t) => s + t.montant, 0)
+  const nomProduit = (pid: string) => produits.find((p) => p.id === pid)?.nom ?? '?'
+  const historique = [
+    ...ventes.map((t) => ({ id: t.id, date: t.date, libelle: `${nomProduit(t.produit_id)} × ${t.quantite}`, montant: t.montant, reste: t.montant - t.montant_paye })),
+    ...paiements.filter((p) => p.client_id === c.id && !p.supprime_le).map((p) => ({ id: p.id, date: p.date, libelle: `Paiement (${MODES.find((m) => m[0] === p.mode)?.[1]})`, montant: -p.montant, reste: 0 })),
+  ].sort((a, b) => b.date.localeCompare(a.date)).slice(0, NB_HISTORIQUE)
+
+  return (
+    <main>
+      <Link to="/clients" className="discret">← Clients</Link>
+      <h1>{c.nom}</h1>
+      <div className="grille2" style={{ marginBottom: 10 }}>
+        <div className="metrique"><div className="discret">Solde</div><div className={`valeur ${solde > 0 ? 'mauvais' : 'ok'}`} data-testid="solde">{formatFCFA(solde)}</div></div>
+        <div className="metrique"><div className="discret">Chiffre d’affaires</div><div className="valeur">{formatFCFA(ca)}</div></div>
+      </div>
+
+      <button onClick={() => setPaiement((p) => !p)} style={{ width: '100%', marginBottom: 8 }}>Enregistrer un paiement</button>
+      {paiement && <FormulairePaiement clientId={c.id} onFini={() => setPaiement(false)} />}
+      {solde > 0 && (
+        <a className="carte" style={{ display: 'block', textAlign: 'center', color: 'var(--vert)', fontWeight: 600 }} href={lienRappel(c.nom, solde, c.telephone)} target="_blank" rel="noreferrer">
+          Rappel WhatsApp
+        </a>
+      )}
+
+      <label>
+        Téléphone
+        <input inputMode="tel" defaultValue={c.telephone ?? ''} onBlur={(e) => e.target.value !== (c.telephone ?? '') && enregistrer('clients', { ...c, telephone: e.target.value.trim() || null })} />
+      </label>
+
+      <h2>Historique</h2>
+      <div className="carte">
+        {historique.length === 0 && <p className="discret">Aucune opération.</p>}
+        {historique.map((h) => (
+          <div className="ligne" key={h.id}>
+            <span><span className="discret">{formatDate(h.date)}</span> {h.libelle}</span>
+            <span className={h.montant < 0 ? 'ok' : ''}>
+              {formatFCFA(Math.abs(h.montant))}{h.reste > 0 && <span className="mauvais"> (reste {formatFCFA(h.reste)})</span>}
+            </span>
+          </div>
+        ))}
+      </div>
+    </main>
+  )
+}

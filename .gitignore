@@ -1,0 +1,11 @@
+node_modules
+dist
+.env.local
+.env
+.superpowers/
+tests/fixtures/*.xlsx
+/import/
+tsconfig.tsbuildinfo
+tests/fixtures/totaux-attendus.json
+# Spécification et plan : contiennent des chiffres de la ferme, gardés en local et sur Drive
+docs/

@@ -1,0 +1,41 @@
+{
+  "name": "the-good-farm-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc -b --noEmit",
+    "demo": "vite --mode demo"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
+    "idb-keyval": "^6.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0",
+    "recharts": "^2.15.4",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.2.17",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
+    "@types/node": "^20.19.43",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "fake-indexeddb": "^6.2.7",
+    "jsdom": "^25.0.1",
+    "tsx": "^4.23.15",
+    "typescript": "5.6",
+    "vite": "5.4",
+    "vite-plugin-pwa": "^0.21.2",
+    "vitest": "^2.1.9"
+  }
+}
