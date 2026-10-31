@@ -6,6 +6,7 @@ import { statsVentesOeufs } from '../../lib/calculs/oeufs'
 import { argentSorti } from '../../lib/calculs/dettes'
 import { aujourdhui, formatFCFA } from '../../lib/format'
 import { couleur } from '../couleurs'
+import { Titre } from '../composants/Pastille'
 
 type Periode = 'mois' | 'annee' | 'tout'
 const NB_CLIENTS = 30
@@ -39,7 +40,7 @@ export function Rapports() {
 
   return (
     <main>
-      <h1>Rapports</h1>
+      <Titre genre="rapports">Rapports</Titre>
       <label>
         Période
         <select value={periode} onChange={(e) => setPeriode(e.target.value as Periode)}>

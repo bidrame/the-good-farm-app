@@ -16,7 +16,7 @@ const relu = (wb: XLSX.WorkBook) => XLSX.read(XLSX.write(wb, { type: 'array', bo
 
 describe('construireClasseur', () => {
   it('contient exactement les six onglets prévus', () => {
-    expect(construireClasseur(donnees(), '2026-10-31').SheetNames).toEqual(['Transactions', 'Paiements', 'Crédits clients', 'Dettes fournisseurs', 'Bandes', 'Ponte', 'Bilan mensuel'])
+    expect(construireClasseur(donnees(), '2026-10-31').SheetNames).toEqual(['Transactions', 'Paiements', 'Crédits clients', 'Dettes fournisseurs', 'Bandes', 'Ponte', 'Mortalités', 'Bilan mensuel'])
   })
   it('exporte les dépenses en négatif comme l’ancien classeur, sans les lignes supprimées', () => {
     const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(relu(construireClasseur(donnees(), '2026-10-31')).Sheets.Transactions)

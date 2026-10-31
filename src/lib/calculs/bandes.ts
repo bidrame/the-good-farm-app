@@ -1,5 +1,5 @@
 import { joursEntre } from '../format'
-import type { Bande, DateISO, Ponte, Recensement } from '../types'
+import type { Bande, DateISO, Mortalite, Ponte, Recensement } from '../types'
 
 export type Phase = 'demarrage' | 'croissance' | 'pre_ponte' | 'ponte' | 'fin_de_cycle'
 
@@ -25,10 +25,10 @@ export function phase(semaines: number): Phase {
   return 'fin_de_cycle'
 }
 
-function mortalite(b: Bande, pontes: Ponte[], garder: (d: DateISO) => boolean): number {
-  return pontes
-    .filter((p) => p.bande_id === b.id && !p.supprime_le && garder(p.date))
-    .reduce((s, p) => s + p.mortalite, 0)
+/** Morts notées avec la ponte et morts déclarées à part. */
+function mortalite(b: Bande, pontes: Ponte[], mortalites: Mortalite[], garder: (d: DateISO) => boolean): number {
+  const garde = (x: { bande_id: string; supprime_le?: string | null; date: DateISO }) => x.bande_id === b.id && !x.supprime_le && garder(x.date)
+  return pontes.filter(garde).reduce((s, p) => s + p.mortalite, 0) + mortalites.filter(garde).reduce((s, m) => s + m.nombre, 0)
 }
 
 /** Dernier recomptage de la bande dont la date passe le filtre. */
@@ -39,22 +39,27 @@ function dernierRecomptage(b: Bande, recensements: Recensement[], garder: (d: Da
 }
 
 /** Effectif au soir de `jusquA` (ou aujourd'hui) : dernier recomptage, sinon effectif initial, moins la mortalité notée depuis. */
-export function effectifActuel(b: Bande, pontes: Ponte[], jusquA?: DateISO, recensements: Recensement[] = []): number {
+export function effectifActuel(b: Bande, pontes: Ponte[], jusquA?: DateISO, recensements: Recensement[] = [], mortalites: Mortalite[] = []): number {
   const dansPeriode = (d: DateISO) => jusquA === undefined || d <= jusquA
   const r = dernierRecomptage(b, recensements, dansPeriode)
-  return (r?.effectif ?? b.effectif_initial) - mortalite(b, pontes, (d) => dansPeriode(d) && (!r || d > r.date))
+  return (r?.effectif ?? b.effectif_initial) - mortalite(b, pontes, mortalites, (d) => dansPeriode(d) && (!r || d > r.date))
 }
 
 /** Poules présentes le matin du jour donné (recomptages et mortalité des jours précédents). */
-export function effectifPresent(b: Bande, pontes: Ponte[], date: DateISO, recensements: Recensement[] = []): number {
+export function effectifPresent(b: Bande, pontes: Ponte[], date: DateISO, recensements: Recensement[] = [], mortalites: Mortalite[] = []): number {
   const r = dernierRecomptage(b, recensements, (d) => d < date)
-  return (r?.effectif ?? b.effectif_initial) - mortalite(b, pontes, (d) => d < date && (!r || d > r.date))
+  return (r?.effectif ?? b.effectif_initial) - mortalite(b, pontes, mortalites, (d) => d < date && (!r || d > r.date))
 }
 
 /** Poules manquantes constatées au recomptage : effectif attendu ce jour-là moins effectif compté. */
-export function ecartRecomptage(b: Bande, pontes: Ponte[], r: Recensement, recensements: Recensement[]): number {
+export function ecartRecomptage(b: Bande, pontes: Ponte[], r: Recensement, recensements: Recensement[], mortalites: Mortalite[] = []): number {
   const avant = recensements.filter((x) => x.id !== r.id && x.date < r.date)
-  return effectifActuel(b, pontes, r.date, avant) - r.effectif
+  return effectifActuel(b, pontes, r.date, avant, mortalites) - r.effectif
+}
+
+/** Une bande dont l'effectif a été compté : case cochée ou au moins un recomptage. */
+export function estVerifiee(b: Bande, recensements: Recensement[]): boolean {
+  return !!b.effectif_verifie || recensements.some((r) => r.bande_id === b.id && !r.supprime_le)
 }
 
 export function bandesEnProduction(bandes: Bande[], pontes: Ponte[], ref: DateISO): Bande[] {

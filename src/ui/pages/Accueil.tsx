@@ -1,8 +1,8 @@
-import { IconCash, IconEgg, IconReceipt } from '@tabler/icons-react'
 import { Link } from 'react-router-dom'
 import { useDonnees } from '../../data/useDonnees'
 import { calculerAlertes } from '../../lib/calculs/alertes'
 import { bandesEnProduction } from '../../lib/calculs/bandes'
+import { fiabiliteEffectif } from '../../lib/calculs/effectifs'
 import { couleurTendance, oeufsFerme, tendanceOeufs } from '../../lib/calculs/suiviOeufs'
 import { bilanMensuel } from '../../lib/calculs/bilans'
 import { soldesClients } from '../../lib/calculs/credits'
@@ -12,6 +12,9 @@ import { ajouterJours, aujourdhui, formatFCFA } from '../../lib/format'
 import { Compteur } from '../composants/animations'
 import { Alerte, CarteMetrique } from '../composants/communs'
 import { Oeuf } from '../composants/Oeuf'
+import { Pastille } from '../composants/Pastille'
+import { ICONES, TAILLE } from '../icones'
+import { teinteBande } from '../bandes'
 
 const NOMS_MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre']
 
@@ -24,14 +27,17 @@ function moisPrecedent(periode: string): string {
   return m === 1 ? `${a - 1}-12` : `${a}-${String(m - 1).padStart(2, '0')}`
 }
 
+// Flèche de tendance ; « = » quand l'écart arrondi est nul.
+const fleche = (ecart: number) => (Math.round(ecart * 100) === 0 ? '=' : ecart > 0 ? '▲' : '▼')
+
 const RACCOURCIS = [
-  { vers: '/saisir', libelle: 'Vente', Icone: IconCash, fond: 'var(--vert)', texte: 'var(--sur-vert)' },
-  { vers: '/ponte', libelle: 'Ponte', Icone: IconEgg, fond: 'var(--jaune)', texte: '#3d2a00' },
-  { vers: '/saisir?type=depense', libelle: 'Dépense', Icone: IconReceipt, fond: 'var(--carte)', texte: 'var(--texte)' },
+  { vers: '/saisir', libelle: 'Vente', Icone: ICONES.vente, fond: 'var(--vert)', texte: 'var(--sur-vert)' },
+  { vers: '/ponte', libelle: 'Ponte', Icone: ICONES.ponte, fond: 'var(--jaune)', texte: '#3d2a00' },
+  { vers: '/saisir?type=depense', libelle: 'Dépense', Icone: ICONES.depense, fond: 'var(--t-rouge-fond)', texte: 'var(--t-rouge)' },
 ]
 
 export function Accueil() {
-  const { transactions, paiements, clients, produits, bandes, ponte, reglages, enAttente } = useDonnees()
+  const { transactions, paiements, clients, produits, bandes, ponte, recensements, mortalites, reglages, enAttente } = useDonnees()
   const ref = aujourdhui()
   const hier = ajouterJours(ref, -1)
   const r = reglages[0]
@@ -59,6 +65,7 @@ export function Accueil() {
   const evolutionFerme = moyenneFerme && oeufsHier ? (oeufsHier - moyenneFerme) / moyenneFerme : null
   const stock = r?.stock_depart ? decomposer(Math.max(0, stockOeufs({ pontes: ponte, transactions, produits, depart: r.stock_depart })), OEUFS_PAR_PLATEAU) : null
 
+  const aVerifier = enProd.filter((b) => fiabiliteEffectif(b, { pontes: ponte, recensements, mortalites }, hier, r?.courbe_attendue).incoherent)
   const alertes = calculerAlertes({ ref, heure: new Date().getHours(), bandes, pontes: ponte, derniereSauvegarde: r?.derniere_sauvegarde ?? null, seuils: r?.seuils, dettes: dettes.lignes })
 
   return (
@@ -82,43 +89,48 @@ export function Accueil() {
       <nav aria-label="Raccourcis" className="raccourcis">
         {RACCOURCIS.map(({ vers, libelle, Icone, fond, texte }) => (
           <Link key={vers} to={vers} style={{ background: fond, color: texte }}>
-            <Icone size={24} aria-hidden="true" />{libelle}
+            <Icone size={TAILLE.carte + 4} stroke={1.75} aria-hidden="true" />{libelle}
           </Link>
         ))}
       </nav>
 
       {enAttente > 0 && <div className="alerte attention">En attente d’envoi ({enAttente})</div>}
       {alertes.map((a, i) => <Alerte key={i} alerte={a} />)}
+      {aVerifier.length > 0 && (
+        <Link to={`/bandes/${aVerifier[0].id}`} style={{ textDecoration: 'none' }}>
+          <Alerte alerte={{ niveau: 'attention', code: 'effectif_a_verifier', message: `Effectif à vérifier : ${aVerifier.map((b) => b.nom).join(', ')}. La ponte ne correspond pas au nombre de poules noté ; recomptez pour des taux fiables →` }} />
+        </Link>
+      )}
 
       <div className="grille2" style={{ margin: '4px 0 12px' }}>
-        <CarteMetrique libelle="Ventes" valeur={formatFCFA(ce.ventes)} variation={variation(ce.ventes, avant?.ventes)} />
-        <CarteMetrique libelle="Dépenses" valeur={formatFCFA(ce.depenses)} variation={variation(ce.depenses, avant?.depenses)} hausseMauvaise />
+        <CarteMetrique genre="vente" libelle="Ventes" valeur={formatFCFA(ce.ventes)} variation={variation(ce.ventes, avant?.ventes)} />
+        <CarteMetrique genre="depense" libelle="Dépenses" valeur={formatFCFA(ce.depenses)} variation={variation(ce.depenses, avant?.depenses)} hausseMauvaise />
         <Link to="/clients" style={{ color: 'inherit', textDecoration: 'none' }}>
-          <CarteMetrique libelle="Crédits dus" valeur={formatFCFA(credits)} />
+          <CarteMetrique genre="credit" libelle="Crédits dus" valeur={formatFCFA(credits)} teinteValeur={credits > 0 ? 'du' : undefined} />
         </Link>
         <Link to="/fournisseurs" style={{ color: 'inherit', textDecoration: 'none' }}>
-          <CarteMetrique libelle="À payer" valeur={formatFCFA(dettes.total)} />
+          <CarteMetrique genre="aPayer" libelle="À payer" valeur={formatFCFA(dettes.total)} teinteValeur={dettes.total > 0 ? 'du' : undefined} />
         </Link>
         {stock ? (
-          <CarteMetrique libelle="Stock d’œufs" valeur={`${stock.lots} plateaux${stock.restants ? ` + ${stock.restants}` : ''}`} />
+          <CarteMetrique genre="stock" libelle="Stock d’œufs" valeur={`${stock.lots} plateaux${stock.restants ? ` + ${stock.restants}` : ''}`} />
         ) : (
           <Link to="/reglages" className="metrique" style={{ color: 'var(--vert)', textDecoration: 'none', fontWeight: 700 }}>
-            <div className="discret">Stock d’œufs</div>Faire l’inventaire →
+            <div className="tete"><Pastille genre="stock" petite /><span className="discret">Stock d’œufs</span></div>Faire l’inventaire →
           </Link>
         )}
       </div>
 
       <section aria-label="Ponte d’hier" className="carte">
-        <h2 style={{ marginTop: 0 }}>Ponte d’hier</h2>
+        <h2 className="entete-ligne" style={{ marginTop: 0 }}><Pastille genre="ponte" petite />Ponte d’hier</h2>
         {ponteHier.map(({ b, p, tendance }) => {
           const classe = tendance ? couleurTendance(tendance.ecart, r?.seuils?.baisse_pct) : ''
           return (
             <div key={b.id} className="ligne">
-              <span>{b.nom} <span className="discret">box {b.box}</span></span>
+              <span><span className="point-bande" style={{ background: teinteBande(b) }} aria-hidden="true" />{b.nom} <span className="discret">box {b.box}</span></span>
               {p == null ? <span className="discret">non saisie</span> : (
                 <span style={{ textAlign: 'right' }}>
                   <strong>{p.oeufs_collectes} œufs</strong>
-                  {tendance && <span className={classe} style={{ display: 'block', fontSize: 12, fontWeight: 700 }}>{tendance.ecart >= 0 ? '▲' : '▼'} {Math.abs(Math.round(tendance.ecart * 100))} % vs 7 j</span>}
+                  {tendance && <span className={classe} style={{ display: 'block', fontSize: 12, fontWeight: 700 }}>{fleche(tendance.ecart)} {Math.abs(Math.round(tendance.ecart * 100))} % vs 7 j</span>}
                 </span>
               )}
             </div>
@@ -130,7 +142,7 @@ export function Accueil() {
             <strong>{oeufsHier} œufs · {totalHier.lots} plateaux + {totalHier.restants}</strong>
             {evolutionFerme != null && (
               <span data-testid="evolution-ferme" className={couleurTendance(evolutionFerme, r?.seuils?.baisse_pct)} style={{ display: 'block', fontSize: 12, fontWeight: 700 }}>
-                {evolutionFerme >= 0 ? '▲' : '▼'} {Math.abs(Math.round(evolutionFerme * 100))} % par rapport à la moyenne de 7 jours
+                {fleche(evolutionFerme)} {Math.abs(Math.round(evolutionFerme * 100))} % par rapport à la moyenne de 7 jours
               </span>
             )}
           </span>

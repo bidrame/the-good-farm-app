@@ -1,5 +1,7 @@
 import * as XLSX from 'xlsx'
 import type { Donnees } from '../data/useDonnees'
+import { boxesFerme, ouvrierDuBox } from '../lib/calculs/boxes'
+import { fiabiliteEffectif } from '../lib/calculs/effectifs'
 import { LIBELLE_PHASE, ageSemaines, effectifActuel, effectifPresent, phase } from '../lib/calculs/bandes'
 import { bilanMensuel } from '../lib/calculs/bilans'
 import { soldesClients } from '../lib/calculs/credits'
@@ -61,21 +63,30 @@ export function construireClasseur(d: Donnees, ref: DateISO): XLSX.WorkBook {
     Fournisseur: l.fournisseur.nom, 'Reste à payer': l.du, 'Depuis le': dateExcel(l.depuis), Jours: l.jours,
   })), ['Fournisseur', 'Reste à payer', 'Depuis le', 'Jours']), 'Dettes fournisseurs')
 
-  XLSX.utils.book_append_sheet(wb, feuille(d.bandes.filter((b) => !b.supprime_le).sort((a, b) => a.nom.localeCompare(b.nom)).map((b) => ({
-    Bande: b.nom, Box: b.box, 'Née le': dateExcel(b.date_naissance), 'Effectif initial': b.effectif_initial,
-    'Effectif actuel': effectifActuel(b, d.ponte, undefined, d.recensements), 'Âge (sem)': ageSemaines(b, ref),
-    Phase: b.date_reforme ? 'Réformée' : LIBELLE_PHASE[phase(ageSemaines(b, ref))], 'Réformée le': dateExcel(b.date_reforme),
-    Ouvrier: nom(d.ouvriers, b.ouvrier_id),
-  })), ['Bande', 'Box', 'Née le', 'Effectif initial', 'Effectif actuel', 'Âge (sem)', 'Phase', 'Réformée le', 'Ouvrier']), 'Bandes')
+  const boxes = boxesFerme(d.reglages[0], d.bandes)
+  XLSX.utils.book_append_sheet(wb, feuille(d.bandes.filter((b) => !b.supprime_le).sort((a, b) => a.nom.localeCompare(b.nom)).map((b) => {
+    const f = fiabiliteEffectif(b, { pontes: d.ponte, recensements: d.recensements, mortalites: d.mortalites }, ref, d.reglages[0]?.courbe_attendue)
+    return {
+      Bande: b.nom, Box: b.box, 'Née le': dateExcel(b.date_naissance), 'Effectif initial': b.effectif_initial,
+      'Effectif actuel': effectifActuel(b, d.ponte, undefined, d.recensements, d.mortalites), 'Effectif vérifié': f.verifie ? 'oui' : 'non',
+      'Estimé d’après la ponte': b.date_reforme ? null : f.estime, 'Âge (sem)': ageSemaines(b, ref),
+      Phase: b.date_reforme ? 'Réformée' : LIBELLE_PHASE[phase(ageSemaines(b, ref))], 'Réformée le': dateExcel(b.date_reforme),
+      Ouvrier: nom(d.ouvriers, b.date_reforme ? b.ouvrier_id : ouvrierDuBox(boxes, b.box)),
+    }
+  }), ['Bande', 'Box', 'Née le', 'Effectif initial', 'Effectif actuel', 'Effectif vérifié', 'Estimé d’après la ponte', 'Âge (sem)', 'Phase', 'Réformée le', 'Ouvrier']), 'Bandes')
 
   XLSX.utils.book_append_sheet(wb, feuille(d.ponte.filter((p) => !p.supprime_le).sort((a, b) => b.date.localeCompare(a.date)).map((p) => {
     const b = d.bandes.find((x) => x.id === p.bande_id)
     return {
       Date: dateExcel(p.date), Bande: b?.nom ?? '', 'Œufs collectés': p.oeufs_collectes, 'Œufs perdus': p.oeufs_perdus,
-      Mortalité: p.mortalite, 'Aliment (kg)': p.aliment_kg, 'Taux de ponte': b ? Math.round(tauxPonte(p.oeufs_collectes, effectifPresent(b, d.ponte, p.date, d.recensements)) * 1000) / 1000 : null,
+      Mortalité: p.mortalite, 'Aliment (kg)': p.aliment_kg, 'Taux de ponte': b ? Math.round(tauxPonte(p.oeufs_collectes, effectifPresent(b, d.ponte, p.date, d.recensements, d.mortalites)) * 1000) / 1000 : null,
       Observation: p.observation ?? '',
     }
   }), ['Date', 'Bande', 'Œufs collectés', 'Œufs perdus', 'Mortalité', 'Aliment (kg)', 'Taux de ponte', 'Observation']), 'Ponte')
+
+  XLSX.utils.book_append_sheet(wb, feuille(d.mortalites.filter((m) => !m.supprime_le).sort((a, b) => b.date.localeCompare(a.date)).map((m) => ({
+    Date: dateExcel(m.date), Bande: nom(d.bandes, m.bande_id), Morts: m.nombre, Observation: m.observation ?? '',
+  })), ['Date', 'Bande', 'Morts', 'Observation']), 'Mortalités')
 
   XLSX.utils.book_append_sheet(wb, feuille(bilanMensuel(d.transactions).map((l) => ({
     Mois: l.periode, Ventes: l.ventes, Dépenses: l.depenses, Résultat: l.resultat, Cumul: l.cumul,

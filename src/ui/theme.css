@@ -18,6 +18,15 @@
   --attention-fond: #fff4d1;
   --danger: #b3261e;
   --danger-fond: #fdecea;
+  /* Teintes des pastilles : fond doux + icône foncée (contraste ≥ 4.5:1) */
+  --t-vert-fond: #e3f0d6; --t-vert: #2f6b12;
+  --t-rouge-fond: #fbe4df; --t-rouge: #a3321f;
+  --t-ambre-fond: #ffefc2; --t-ambre: #6e4a00;
+  --t-terre-fond: #f1e4d2; --t-terre: #74461a;
+  --t-bleu-fond: #dcecee; --t-bleu: #1d5a66;
+  --t-neutre-fond: #ecebe2; --t-neutre: #4c5643;
+  --entree: #2f6b12; --sortie: #b3261e; --du: #7a5200;
+  --bande-1: #3f7d20; --bande-2: #c0870a; --bande-3: #b0502a; --bande-4: #2e7480; --bande-5: #7a5aa6; --bande-6: #8a6a3a;
   --ombre: 0 1px 2px rgba(31, 42, 20, 0.06), 0 4px 14px rgba(31, 42, 20, 0.05);
   --rayon: 14px;
   --rayon-carte: 18px;
@@ -44,6 +53,14 @@
     --attention-fond: #3a2e0a;
     --danger: #ff9c94;
     --danger-fond: #3d1714;
+    --t-vert-fond: #24381a; --t-vert: #a6d978;
+    --t-rouge-fond: #3d1a16; --t-rouge: #ff9c94;
+    --t-ambre-fond: #3a2e0a; --t-ambre: #ffd54a;
+    --t-terre-fond: #352719; --t-terre: #e7b98a;
+    --t-bleu-fond: #16323a; --t-bleu: #8fd0dc;
+    --t-neutre-fond: #262f20; --t-neutre: #c3cdb7;
+    --entree: #a6d978; --sortie: #ff9c94; --du: #ffd54a;
+    --bande-1: #8fcb5b; --bande-2: #ffd54a; --bande-3: #f0a07a; --bande-4: #8fd0dc; --bande-5: #c3a6ee; --bande-6: #e0c08f;
     --ombre: 0 1px 2px rgba(0, 0, 0, 0.3);
   }
 }
@@ -132,6 +149,33 @@ td.nombre, th.nombre { text-align: right; white-space: nowrap; }
 
 .coche circle { stroke: var(--vert-vif); fill: var(--vert-clair); }
 .coche path { stroke: var(--vert); stroke-dasharray: 48; stroke-dashoffset: 48; animation: trace 0.45s 0.1s ease-out forwards; }
+
+/* Pastilles d’icônes, titres, montants signés, états vides */
+.pastille { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 13px; }
+.pastille.petite { width: 30px; height: 30px; border-radius: 10px; }
+.teinte-vert { background: var(--t-vert-fond); color: var(--t-vert); }
+.teinte-rouge { background: var(--t-rouge-fond); color: var(--t-rouge); }
+.teinte-ambre { background: var(--t-ambre-fond); color: var(--t-ambre); }
+.teinte-terre { background: var(--t-terre-fond); color: var(--t-terre); }
+.teinte-bleu { background: var(--t-bleu-fond); color: var(--t-bleu); }
+.teinte-neutre { background: var(--t-neutre-fond); color: var(--t-neutre); }
+h1.titre { display: flex; align-items: center; gap: 10px; }
+.entree { color: var(--entree); } .sortie { color: var(--sortie); } .du { color: var(--du); }
+.metrique .tete { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.metrique .tete .discret { font-weight: 700; }
+.etat-vide { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; padding: 14px 8px; }
+.etat-vide p { margin: 0; color: var(--texte-2); font-weight: 600; }
+.etat-vide .pastille { width: 52px; height: 52px; border-radius: 17px; }
+.entete-ligne { display: flex; align-items: center; gap: 10px; min-width: 0; }
+a.carte.lien-carte { display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; }
+a.carte.lien-carte:active, a.metrique:active, a.ligne:active { transform: scale(0.985); }
+a.carte.lien-carte .chevron { margin-left: auto; color: var(--texte-2); }
+button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+button.lien { display: inline; }
+button.principal:active { background: var(--vert-vif); border-color: var(--vert-vif); }
+a.metrique, a.ligne, a.carte { transition: transform 0.08s; }
+.point-bande { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+.carte.bordure-bande { border-left-width: 5px; }
 
 @keyframes apparition { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes fondu { from { opacity: 0; } to { opacity: 1; } }

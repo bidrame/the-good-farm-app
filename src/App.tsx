@@ -32,7 +32,7 @@ function expliquer(erreur: string): string {
 
 const NOM_TABLE: Record<string, string> = {
   transactions: 'vente ou dépense', paiements: 'paiement', ponte: 'ponte', bandes: 'bande', clients: 'client',
-  produits: 'produit', ouvriers: 'ouvrier', reglages: 'réglages', profils: 'profil', recensements: 'recomptage',
+  produits: 'produit', ouvriers: 'ouvrier', reglages: 'réglages', profils: 'profil', recensements: 'recomptage', mortalites: 'mortalité',
 }
 
 function BandeauEtat() {

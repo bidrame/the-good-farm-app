@@ -5,7 +5,7 @@ import { DonneesFixes, type Actions } from '../../src/data/useDonnees'
 import { BANDES, ponte } from '../fixtures/bandes'
 import type { Ponte as TPonte } from '../../src/lib/types'
 
-const bandes = BANDES.map((b) => (b.id === 'b4' ? { ...b, effectif_initial: 572 } : b))
+const bandes = BANDES.map((b) => (b.id === 'b4' ? { ...b, effectif_initial: 572, effectif_verifie: true } : b))
 const esp = (s: string | null | undefined) => (s ?? '').replace(/\s/g, ' ')
 
 function afficher(pontes: TPonte[] = [], actions: Partial<Actions> = {}) {
@@ -113,7 +113,17 @@ describe('Ponte du jour', () => {
     expect(enregistrer).toHaveBeenCalledWith('ponte', expect.objectContaining({ id: 'existante', oeufs_collectes: 505 }))
   })
 
-  it('demande confirmation quand il y a plus d’œufs que de poules', async () => {
+  it('pour une bande non comptée, signale l’effectif à vérifier au lieu d’un taux impossible', async () => {
+    const { u } = afficher()
+    await u.type(within(carte('BANDE 5')).getByLabelText('Plateaux de 30'), '66') // 1 980 œufs pour 620 poules notées
+    expect(within(carte('BANDE 5')).getByTestId('taux')).toHaveTextContent('effectif à vérifier')
+    expect(within(carte('BANDE 5')).getByTestId('taux')).not.toHaveTextContent('%')
+    await continuer(u)
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole('region', { name: 'Récapitulatif' })).toBeInTheDocument()
+  })
+
+  it('demande confirmation quand il y a plus d’œufs que de poules comptées', async () => {
     const { u, enregistrer } = afficher()
     await u.type(within(carte('BANDE 4')).getByLabelText('Plateaux de 30'), '24')
     await continuer(u)
@@ -131,18 +141,15 @@ describe('Ponte du jour', () => {
 })
 
 describe('Ponte : robustesse', () => {
-  it('réenregistre la même ligne quand on corrige après un premier enregistrement', async () => {
+  it('ne propose plus de corriger une fois la ponte validée', async () => {
     const { u, enregistrer } = afficher()
     await u.type(within(carte('BANDE 4')).getByLabelText('Plateaux de 30'), '16')
     await continuer(u)
     await valider(u)
-    await u.click(screen.getByRole('button', { name: 'Corriger' }))
-    await u.type(within(carte('BANDE 4')).getByLabelText('+ œufs'), '3')
-    await continuer(u)
-    await valider(u)
-    const ids = enregistrer.mock.calls.map((c) => (c[1] as { id: string }).id)
-    expect(ids).toHaveLength(2)
-    expect(ids[1]).toBe(ids[0])
+    expect(enregistrer).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: 'Corriger' })).toBeNull()
+    await u.click(screen.getByRole('button', { name: 'Retour à l’accueil' }))
+    expect(window.location.hash).toBe('#/')
   })
 
   it('reprend l’id d’une ponte du jour arrivée de l’autre téléphone', async () => {

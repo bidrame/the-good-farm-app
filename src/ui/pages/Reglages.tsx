@@ -8,6 +8,7 @@ import { aujourdhui, formatDate } from '../../lib/format'
 import { ChampMontant } from '../composants/communs'
 import type { Conditionnement, Seuils } from '../../lib/types'
 import type { TypeTx, Unite } from '../../lib/types'
+import { Titre } from '../composants/Pastille'
 
 const UNITES: [Unite, string][] = [['plaque', 'Plaque de 30'], ['unite', 'Unité'], ['kg', 'Kg'], ['forfait', 'Forfait'], ['autre', 'Autre']]
 
@@ -196,7 +197,7 @@ function Inventaire() {
 export function Reglages() {
   return (
     <main>
-      <h1>Réglages</h1>
+      <Titre genre="reglages">Réglages</Titre>
       <Inventaire />
       <Conditionnements />
       <Courbe />

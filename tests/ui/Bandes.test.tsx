@@ -6,6 +6,7 @@ import { BandeFiche } from '../../src/ui/pages/BandeFiche'
 import { DonneesFixes } from '../../src/data/useDonnees'
 import { BANDES, ponte } from '../fixtures/bandes'
 import type { Bande, Recensement } from '../../src/lib/types'
+import type { Donnees } from '../../src/data/useDonnees'
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
@@ -13,11 +14,11 @@ beforeEach(() => {
 })
 afterEach(() => vi.useRealTimers())
 
-function afficher(chemin: string, bandes: Bande[] = BANDES, recensements: Recensement[] = []) {
+function afficher(chemin: string, bandes: Bande[] = BANDES, recensements: Recensement[] = [], extra: Partial<Donnees> = {}) {
   const enregistrer = vi.fn(async (_t: string, l: Record<string, unknown>) => (l.id as string) ?? 'x')
   const pontes = [ponte('b4', '2026-10-30', { oeufs_collectes: 520, mortalite: 3 }), ponte('b4', '2026-10-29', { oeufs_collectes: 500 })]
   render(
-    <DonneesFixes donnees={{ bandes, ponte: pontes, recensements }} actions={{ enregistrer }}>
+    <DonneesFixes donnees={{ bandes, ponte: pontes, recensements, ...extra }} actions={{ enregistrer }}>
       <MemoryRouter initialEntries={[chemin]}>
         <Routes>
           <Route path="/bandes" element={<Bandes />} />
@@ -106,5 +107,81 @@ describe('Recompter la bande', () => {
     expect(zone).toHaveTextContent('20/10/2026')
     expect(zone).toHaveTextContent('620 poules')
     expect(zone).toHaveTextContent('30 manquantes')
+  })
+})
+
+const OUVRIERS = [{ id: 'o1', nom: 'FALLOU', actif: true }, { id: 'o2', nom: 'DAOUDA', actif: true }]
+
+describe('Boxes et ouvriers', () => {
+  it('affecte un ouvrier à un box', async () => {
+    const { u, enregistrer } = afficher('/bandes', BANDES, [], { ouvriers: OUVRIERS })
+    const zone = screen.getByRole('region', { name: 'Boxes et ouvriers' })
+    await u.selectOptions(within(zone).getByLabelText(/Box 2/), 'o2')
+    expect(enregistrer).toHaveBeenCalledWith('reglages', { id: 1, boxes: [
+      { numero: 1, ouvrier_id: null }, { numero: 2, ouvrier_id: 'o2' }, { numero: 3, ouvrier_id: null }, { numero: 4, ouvrier_id: null },
+    ] })
+  })
+
+  it('ajoute un 5e box, où l’on peut ensuite créer une bande', async () => {
+    const { u, enregistrer } = afficher('/bandes', BANDES, [], { ouvriers: OUVRIERS, reglages: [{ id: 1, boxes: [1, 2, 3, 4, 5].map((numero) => ({ numero, ouvrier_id: numero === 5 ? 'o1' : null })) }] })
+    expect(within(screen.getByRole('region', { name: 'Boxes et ouvriers' })).getByText(/libre/)).toBeInTheDocument()
+    await u.click(screen.getByRole('button', { name: 'Nouvelle bande' }))
+    expect([...(screen.getByLabelText('Box') as HTMLSelectElement).options].map((o) => o.value)).toEqual(['5'])
+    await u.type(screen.getByLabelText('Nom'), 'BANDE 7')
+    await u.type(screen.getByLabelText('Date de naissance'), '2026-10-01')
+    await u.type(screen.getByLabelText('Effectif initial'), '1000')
+    await u.click(screen.getByRole('button', { name: 'Créer la bande' }))
+    expect(enregistrer).toHaveBeenCalledWith('bandes', expect.objectContaining({ box: 5, ouvrier_id: 'o1' }))
+  })
+
+  it('le bouton « Ajouter un box » enregistre un box de plus', async () => {
+    const { u, enregistrer } = afficher('/bandes', BANDES, [], { ouvriers: OUVRIERS })
+    await u.click(screen.getByRole('button', { name: 'Ajouter un box' }))
+    expect(enregistrer).toHaveBeenCalledWith('reglages', { id: 1, boxes: expect.arrayContaining([{ numero: 5, ouvrier_id: null }]) })
+  })
+
+  it('montre l’ouvrier du box sur la fiche de la bande', () => {
+    afficher('/bandes/b4', BANDES, [], { ouvriers: OUVRIERS, reglages: [{ id: 1, boxes: [{ numero: 2, ouvrier_id: 'o1' }] }] })
+    expect(screen.getByText('Ouvrier').nextSibling).toHaveTextContent('FALLOU')
+  })
+})
+
+describe('Mortalités et effectif à vérifier', () => {
+  it('déclare des morts hors saisie de ponte', async () => {
+    const { u, enregistrer } = afficher('/bandes/b4')
+    await u.click(screen.getByRole('button', { name: 'Déclarer des morts' }))
+    const f = screen.getByRole('form', { name: 'Déclarer des morts' })
+    await u.type(within(f).getByLabelText('Nombre de morts'), '7')
+    await u.click(within(f).getByRole('button', { name: 'Enregistrer les morts' }))
+    expect(enregistrer).toHaveBeenCalledWith('mortalites', expect.objectContaining({ bande_id: 'b4', date: '2026-10-31', nombre: 7 }))
+  })
+
+  it('compte les morts déclarées dans l’effectif', () => {
+    afficher('/bandes/b4', BANDES, [], { mortalites: [{ id: 'm1', bande_id: 'b4', date: '2026-10-25', nombre: 10 }] })
+    expect(screen.getByText('Effectif actuel').nextSibling).toHaveTextContent('637') // 650 − 3 (ponte) − 10
+  })
+
+  it('signale une bande dont la ponte est impossible pour l’effectif noté', () => {
+    const bandes = BANDES.map((b) => (b.id === 'b4' ? { ...b, effectif_initial: 300 } : b))
+    afficher('/bandes/b4', bandes)
+    const avis = screen.getByRole('status', { name: 'Effectif à vérifier' })
+    expect(avis).toHaveTextContent('510 œufs par jour pour 297 poules notées')
+    expect(avis).toHaveTextContent(/≈ \d[\d\s]* poules d’après la ponte/)
+  })
+
+  it('marque « à vérifier » les bandes non comptées dans la liste', () => {
+    const bandes = BANDES.map((b) => (b.id === 'b6' ? { ...b, effectif_verifie: true } : b))
+    afficher('/bandes', bandes)
+    expect(screen.getByRole('link', { name: /BANDE 4/ })).toHaveTextContent('à vérifier')
+    expect(screen.getByRole('link', { name: /BANDE 6/ })).not.toHaveTextContent('à vérifier')
+  })
+
+  it('coche « effectif compté » en modifiant la bande', async () => {
+    const { u, enregistrer } = afficher('/bandes/b4')
+    await u.click(screen.getByRole('button', { name: 'Modifier' }))
+    const f = screen.getByRole('form', { name: 'Modifier la bande' })
+    await u.click(within(f).getByLabelText(/Effectif compté/))
+    await u.click(within(f).getByRole('button', { name: 'Enregistrer' }))
+    expect(enregistrer).toHaveBeenCalledWith('bandes', expect.objectContaining({ id: 'b4', effectif_verifie: true }))
   })
 })

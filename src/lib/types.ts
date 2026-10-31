@@ -63,7 +63,14 @@ export interface Ouvrier extends Audit {
   actif: boolean
 }
 
-export type Box = 1 | 2 | 3 | 4
+/** Numéro de box (1, 2, 3…) : la ferme peut en ajouter. */
+export type Box = number
+
+/** Un box de la ferme et l'ouvrier qui s'en occupe (il reste quand les bandes changent). */
+export interface BoxFerme {
+  numero: Box
+  ouvrier_id: string | null
+}
 
 export interface Bande extends Audit {
   id: string
@@ -74,6 +81,8 @@ export interface Bande extends Audit {
   effectif_initial: number
   date_reforme: DateISO | null
   observations?: string | null
+  /** Effectif initial compté pour de bon (sinon il est estimé d'après la ponte). */
+  effectif_verifie?: boolean
 }
 
 /** Recomptage des poules d'une bande : l'effectif repart de ce nombre le lendemain. */
@@ -82,6 +91,15 @@ export interface Recensement extends Audit {
   bande_id: string
   date: DateISO
   effectif: number
+  observation?: string | null
+}
+
+/** Morts constatées hors saisie de ponte. */
+export interface Mortalite extends Audit {
+  id: string
+  bande_id: string
+  date: DateISO
+  nombre: number
   observation?: string | null
 }
 
@@ -121,4 +139,5 @@ export interface Reglages {
   seuils?: Partial<Seuils> | null
   conditionnements?: Conditionnement[] | null
   stock_depart?: StockDepart | null
+  boxes?: BoxFerme[] | null
 }

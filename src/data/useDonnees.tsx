@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import type { Bande, Client, Ouvrier, Paiement, Ponte, Produit, Recensement, Reglages, Transaction } from '../lib/types'
+import type { Bande, Client, Mortalite, Ouvrier, Paiement, Ponte, Produit, Recensement, Reglages, Transaction } from '../lib/types'
 import { abandonner, enAttente as compterEnAttente, lister, listerRejetees, reessayer, type NomTable, type Rejetee } from './fileAttente'
 import { lireInstantane, sauverInstantane } from './instantane'
 import { creerRafraichisseur } from './rafraichisseur'
@@ -18,12 +18,13 @@ export type Donnees = {
   bandes: Bande[]
   ponte: Ponte[]
   recensements: Recensement[]
+  mortalites: Mortalite[]
   profils: Profil[]
   reglages: (Reglages & { id: number })[]
 }
 
 export const DONNEES_VIDES: Donnees = {
-  clients: [], produits: [], ouvriers: [], transactions: [], paiements: [], bandes: [], ponte: [], recensements: [], profils: [], reglages: [],
+  clients: [], produits: [], ouvriers: [], transactions: [], paiements: [], bandes: [], ponte: [], recensements: [], mortalites: [], profils: [], reglages: [],
 }
 
 export type ContexteDonnees = Donnees & {

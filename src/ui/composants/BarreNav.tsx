@@ -1,12 +1,12 @@
-import { IconCirclePlus, IconDots, IconEgg, IconFeather, IconHome } from '@tabler/icons-react'
 import { NavLink } from 'react-router-dom'
+import { ICONES, NAV } from '../icones'
 
 const LIENS = [
-  { vers: '/', libelle: 'Accueil', Icone: IconHome },
-  { vers: '/saisir', libelle: 'Saisir', Icone: IconCirclePlus },
-  { vers: '/ponte', libelle: 'Ponte', Icone: IconEgg },
-  { vers: '/bandes', libelle: 'Bandes', Icone: IconFeather },
-  { vers: '/plus', libelle: 'Plus', Icone: IconDots },
+  { vers: '/', libelle: 'Accueil', Icone: NAV.accueil },
+  { vers: '/saisir', libelle: 'Saisir', Icone: NAV.saisir },
+  { vers: '/ponte', libelle: 'Ponte', Icone: ICONES.ponte },
+  { vers: '/bandes', libelle: 'Bandes', Icone: ICONES.bande },
+  { vers: '/plus', libelle: 'Plus', Icone: NAV.plus },
 ]
 
 export function BarreNav() {

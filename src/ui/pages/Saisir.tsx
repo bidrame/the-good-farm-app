@@ -12,6 +12,8 @@ import { ChampClient } from '../composants/ChampClient'
 import { ChampMontant, Confirmation } from '../composants/communs'
 import { Recapitulatif, Reussite } from '../composants/Recapitulatif'
 import { useBrouillon } from '../useBrouillon'
+import { IconArrowRight } from '@tabler/icons-react'
+import { IconeBouton, Pastille } from '../composants/Pastille'
 
 type Paye = 'tout' | 'partie' | 'rien'
 
@@ -160,7 +162,7 @@ export function Saisir() {
       <div className="grille2" style={{ marginBottom: 14 }}>
         {(['vente', 'depense'] as const).map((t) => (
           <button key={t} type="button" className={f.type === t ? 'choisi' : ''} onClick={() => { setF(vide(t)); setErreurs({}) }}>
-            {t === 'vente' ? 'Vente' : 'Dépense'}
+            <Pastille genre={t} petite />{t === 'vente' ? 'Vente' : 'Dépense'}
           </button>
         ))}
       </div>
@@ -227,7 +229,7 @@ export function Saisir() {
         <textarea rows={2} value={f.observation} onChange={(e) => maj({ observation: e.target.value })} />
       </label>
 
-      <button className="principal" onClick={() => continuer()}>Continuer</button>
+      <button className="principal" onClick={() => continuer()}>Continuer<IconeBouton Icone={IconArrowRight} /></button>
 
       {doublon && (
         <Confirmation

@@ -4,8 +4,13 @@ import { formatDate } from '../../lib/format'
 import { Confirmation } from '../composants/communs'
 import { ModifierTransaction } from '../composants/ModifierTransaction'
 import { journal, type LigneJournal } from '../lignes'
+import { EtatVide, Pastille, Titre } from '../composants/Pastille'
+import type { Genre as GenreIcone } from '../icones'
 
 const MAX_LIGNES = 100
+const GENRE_ICONE: Record<LigneJournal['genre'], GenreIcone> = { vente: 'vente', depense: 'depense', paiement: 'paiement', ponte: 'ponte' }
+// Entrées en vert, sorties en rouge ; la ponte reste neutre.
+const TEINTE_MONTANT: Record<LigneJournal['genre'], string> = { vente: 'entree', paiement: 'entree', depense: 'sortie', ponte: '' }
 type Genre = 'tout' | LigneJournal['genre']
 
 export function Historique() {
@@ -27,7 +32,7 @@ export function Historique() {
 
   return (
     <main>
-      <h1>Historique</h1>
+      <Titre genre="historique">Historique</Titre>
       <div className="grille2">
         <label>
           Type
@@ -58,13 +63,17 @@ export function Historique() {
       </label>
 
       <p className="discret">{lignes.length} saisie(s){lignes.length > MAX_LIGNES ? `, ${MAX_LIGNES} affichées` : ''}</p>
+      {lignes.length === 0 && <EtatVide genre="historique" message="Aucune saisie ne correspond à ces filtres." />}
       {lignes.slice(0, MAX_LIGNES).map((l) => (
         <article key={`${l.table}-${l.id}`} className="carte">
           <div className="ligne" style={{ padding: 0 }}>
-            <strong>{l.titre}</strong>
+            <span className="entete-ligne">
+              <Pastille genre={GENRE_ICONE[l.genre]} petite />
+              <strong>{l.titre}</strong>
+            </span>
             <span className="discret">{formatDate(l.date)}</span>
           </div>
-          <div>{l.detail}</div>
+          <div className={TEINTE_MONTANT[l.genre]}>{l.detail}</div>
           <div className="ligne" style={{ padding: 0 }}>
             <span className="discret">par {l.auteur}</span>
             <span style={{ display: 'flex', gap: 16 }}>

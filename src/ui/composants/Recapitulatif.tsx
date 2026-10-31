@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
+import { IconCheck, IconPencil } from '@tabler/icons-react'
 import { CocheSucces } from './animations'
+import { IconeBouton } from './Pastille'
 
 /** Résumé d'une saisie avant validation, avec retour rapide au formulaire. */
 export function Recapitulatif({ titre, lignes, total, onModifier, onValider, enCours, libelleValider = 'Valider' }: {
@@ -19,8 +21,8 @@ export function Recapitulatif({ titre, lignes, total, onModifier, onValider, enC
       ))}
       {total && <div className="ligne"><span>{total[0]}</span><span className="total">{total[1]}</span></div>}
       <div className="grille2" style={{ marginTop: 12 }}>
-        <button type="button" onClick={onModifier}>Modifier</button>
-        <button type="button" className="principal" disabled={enCours} onClick={onValider}>{enCours ? 'Enregistrement…' : libelleValider}</button>
+        <button type="button" onClick={onModifier}><IconeBouton Icone={IconPencil} />Modifier</button>
+        <button type="button" className="principal" disabled={enCours} onClick={onValider}>{!enCours && <IconeBouton Icone={IconCheck} />}{enCours ? 'Enregistrement…' : libelleValider}</button>
       </div>
     </section>
   )

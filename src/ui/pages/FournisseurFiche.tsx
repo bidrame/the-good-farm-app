@@ -5,6 +5,7 @@ import { detteFournisseur } from '../../lib/calculs/dettes'
 import { aujourdhui, formatDate, formatFCFA } from '../../lib/format'
 import { FormulairePaiement, MODES } from './ClientFiche'
 import { depuisJours } from './Fournisseurs'
+import { Titre } from '../composants/Pastille'
 
 const NB_HISTORIQUE = 30
 
@@ -28,7 +29,7 @@ export function FournisseurFiche() {
   return (
     <main>
       <Link to="/fournisseurs" className="discret">← Fournisseurs</Link>
-      <h1>{f.nom}</h1>
+      <Titre genre="fournisseur">{f.nom}</Titre>
       <div className="grille2" style={{ marginBottom: 10 }}>
         <div className="metrique">
           <div className="discret">Reste à payer</div>

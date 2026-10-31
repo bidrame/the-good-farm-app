@@ -8,6 +8,7 @@ import { lienRappel } from '../../lib/whatsapp'
 import { vibrer } from '../composants/animations'
 import { ChampMontant } from '../composants/communs'
 import { Recapitulatif, Reussite } from '../composants/Recapitulatif'
+import { Titre } from '../composants/Pastille'
 
 export const MODES: [ModePaiement, string][] = [
   ['especes', 'Espèces'], ['wave', 'Wave'], ['orange_money', 'Orange Money'], ['virement', 'Virement'], ['autre', 'Autre'],
@@ -95,7 +96,7 @@ export function ClientFiche() {
   return (
     <main>
       <Link to="/clients" className="discret">← Clients</Link>
-      <h1>{c.nom}</h1>
+      <Titre genre="client">{c.nom}</Titre>
       <div className="grille2" style={{ marginBottom: 10 }}>
         <div className="metrique"><div className="discret">Solde</div><div className={`valeur ${solde > 0 ? 'mauvais' : 'ok'}`} data-testid="solde">{solde >= 0 ? formatFCFA(solde) : `Avance ${formatFCFA(-solde)}`}</div></div>
         <div className="metrique"><div className="discret">Chiffre d’affaires</div><div className="valeur">{formatFCFA(ca)}</div></div>

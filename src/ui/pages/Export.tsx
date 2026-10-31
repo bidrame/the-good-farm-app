@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useDonnees } from '../../data/useDonnees'
 import { fichierExcel } from '../../export/exportExcel'
 import { aujourdhui, formatDate } from '../../lib/format'
+import { Titre } from '../composants/Pastille'
 
 function telecharger(f: File) {
   const url = URL.createObjectURL(f)
@@ -39,7 +40,7 @@ export function Export() {
 
   return (
     <main>
-      <h1>Export Excel</h1>
+      <Titre genre="export">Export Excel</Titre>
       <div className="carte">
         <p>Crée un classeur Excel avec toutes les données (transactions, paiements, crédits, bandes, ponte, bilan mensuel), à envoyer sur Google Drive, WhatsApp ou par e-mail.</p>
         <p className="discret">Dernière sauvegarde : {derniere ? formatDate(derniere) : 'jamais'}</p>

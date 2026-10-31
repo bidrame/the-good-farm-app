@@ -2,13 +2,17 @@ import { IconAlertOctagon, IconAlertTriangle, IconInfoCircle } from '@tabler/ico
 import { useState, type ReactNode } from 'react'
 import { formatFCFA, parseMontant } from '../../lib/format'
 import type { Alerte as TAlerte } from '../../lib/calculs/alertes'
+import type { Genre } from '../icones'
+import { Pastille } from './Pastille'
 
 /** `hausseMauvaise` : pour les dépenses, une hausse s'affiche en rouge. */
-export function CarteMetrique({ libelle, valeur, variation, hausseMauvaise = false }: { libelle: string; valeur: string; variation?: number | null; hausseMauvaise?: boolean }) {
+export function CarteMetrique({ libelle, valeur, variation, hausseMauvaise = false, genre, teinteValeur }: {
+  libelle: string; valeur: string; variation?: number | null; hausseMauvaise?: boolean; genre?: Genre; teinteValeur?: 'entree' | 'sortie' | 'du'
+}) {
   return (
     <div className="metrique">
-      <div className="discret">{libelle}</div>
-      <div className="valeur">{valeur}</div>
+      {genre ? <div className="tete"><Pastille genre={genre} petite /><span className="discret">{libelle}</span></div> : <div className="discret">{libelle}</div>}
+      <div className={`valeur${teinteValeur ? ` ${teinteValeur}` : ''}`}>{valeur}</div>
       {variation != null && Number.isFinite(variation) && (
         <div className={(variation >= 0) !== hausseMauvaise ? 'ok' : 'mauvais'} style={{ fontSize: 13 }}>
           {variation >= 0 ? '▲' : '▼'} {Math.abs(Math.round(variation * 100))} %

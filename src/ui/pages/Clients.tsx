@@ -4,6 +4,7 @@ import { useDonnees } from '../../data/useDonnees'
 import { soldesClients } from '../../lib/calculs/credits'
 import { cleNom } from '../../lib/calculs/doublons'
 import { formatFCFA } from '../../lib/format'
+import { EtatVide, Titre } from '../composants/Pastille'
 
 export function Clients() {
   const { clients, transactions, paiements } = useDonnees()
@@ -15,18 +16,18 @@ export function Clients() {
 
   return (
     <main>
-      <h1>Clients et crédits</h1>
+      <Titre genre="client">Clients et crédits</Titre>
       <div className="metrique" style={{ marginBottom: 12 }}>
         <div className="discret">Total à encaisser</div>
         <div className="valeur" data-testid="total-du">{formatFCFA(totalDu)}</div>
       </div>
 
       <section aria-label="Soldes" className="carte">
-        {soldes.length === 0 && <p className="discret">Aucun crédit en cours.</p>}
+        {soldes.length === 0 && <EtatVide genre="credit" message="Aucun crédit en cours : tout le monde a payé." />}
         {soldes.map(({ client, solde }) => (
           <Link key={client.id} to={`/clients/${client.id}`} className="ligne" style={{ color: 'inherit', textDecoration: 'none' }}>
             <span>{client.nom}</span>
-            <strong className={solde > 0 ? 'mauvais' : 'ok'}>{solde > 0 ? formatFCFA(solde) : `Avance de ${formatFCFA(-solde)}`}</strong>
+            <strong className={solde > 0 ? 'du' : 'entree'}>{solde > 0 ? formatFCFA(solde) : `Avance de ${formatFCFA(-solde)}`}</strong>
           </Link>
         ))}
       </section>

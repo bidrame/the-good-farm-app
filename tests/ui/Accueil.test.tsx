@@ -22,7 +22,7 @@ function afficher(heure = 10, enAttente = 0, stock?: { date: string; oeufs: numb
   )
 }
 
-const carte = (libelle: string) => screen.getByText(libelle).parentElement!
+const carte = (libelle: string) => screen.getByText(libelle).closest('.metrique')!
 
 beforeEach(() => vi.useFakeTimers({ toFake: ['Date'] }))
 afterEach(() => vi.useRealTimers())
@@ -94,5 +94,21 @@ describe('Accueil', () => {
   it('signale les saisies en attente d’envoi', () => {
     afficher(10, 2)
     expect(screen.getByText('En attente d’envoi (2)')).toBeInTheDocument()
+  })
+})
+
+describe('Accueil : effectifs à vérifier', () => {
+  it('rappelle de recompter les bandes dont la ponte contredit l’effectif noté', () => {
+    vi.setSystemTime(new Date('2026-10-31T10:00:00'))
+    const d = ferme()
+    d.bandes = d.bandes!.map((b) => (b.id === 'b4' ? { ...b, effectif_initial: 100 } : b))
+    d.ponte = [ponte('b4', '2026-10-30', { oeufs_collectes: 520 })]
+    render(<DonneesFixes donnees={d}><MemoryRouter><Accueil /></MemoryRouter></DonneesFixes>)
+    expect(screen.getByText(/Effectif à vérifier/)).toHaveTextContent('BANDE 4')
+  })
+
+  it('ne dit rien quand la ponte est cohérente', () => {
+    afficher()
+    expect(screen.queryByText(/Effectif à vérifier/)).toBeNull()
   })
 })
