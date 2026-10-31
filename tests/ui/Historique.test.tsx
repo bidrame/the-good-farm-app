@@ -52,28 +52,9 @@ describe('Historique', () => {
     await u.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Supprimer' }))
     expect(supprimer).toHaveBeenCalledWith('transactions', 't7')
   })
-  it('modifie une vente (quantité, montant payé)', async () => {
-    const { u, enregistrer } = afficher(<Historique />)
-    const dame = lignes().find((l) => l.textContent?.includes('Œufs · Dame'))!
-    await u.click(within(dame).getByRole('button', { name: 'Modifier' }))
-    const f = screen.getByRole('form', { name: 'Modifier la saisie' })
-    await u.clear(within(f).getByLabelText('Quantité'))
-    await u.type(within(f).getByLabelText('Quantité'), '6')
-    await u.clear(within(f).getByLabelText('Montant payé'))
-    await u.type(within(f).getByLabelText('Montant payé'), '13200')
-    await u.click(within(f).getByRole('button', { name: 'Enregistrer' }))
-    expect(enregistrer).toHaveBeenCalledWith('transactions', expect.objectContaining({ id: 't3', quantite: 6, montant: 13200, montant_paye: 13200 }))
-  })
-  it('refuse une modification invalide', async () => {
-    const { u, enregistrer } = afficher(<Historique />)
-    const dame = lignes().find((l) => l.textContent?.includes('Œufs · Dame'))!
-    await u.click(within(dame).getByRole('button', { name: 'Modifier' }))
-    const f = screen.getByRole('form', { name: 'Modifier la saisie' })
-    await u.clear(within(f).getByLabelText('Montant payé'))
-    await u.type(within(f).getByLabelText('Montant payé'), '99999')
-    await u.click(within(f).getByRole('button', { name: 'Enregistrer' }))
-    expect(within(f).getByText(/ne peut pas dépasser/)).toBeInTheDocument()
-    expect(enregistrer).not.toHaveBeenCalled()
+  it('ne propose plus de modifier : on supprime puis on ressaisit', () => {
+    afficher(<Historique />)
+    expect(screen.queryByRole('button', { name: 'Modifier' })).not.toBeInTheDocument()
   })
   it('distingue les paiements aux fournisseurs', () => {
     afficher(<Historique />, (d) => { d.paiements = [{ id: 'pf', client_id: 'c-ass', sens: 'fournisseur', date: '2026-10-30', montant: 5000, mode: 'wave' }] })

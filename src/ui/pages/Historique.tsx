@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useDonnees } from '../../data/useDonnees'
 import { formatDate } from '../../lib/format'
 import { Confirmation } from '../composants/communs'
-import { ModifierTransaction } from '../composants/ModifierTransaction'
 import { journal, type LigneJournal } from '../lignes'
 import { EtatVide, Pastille, Titre } from '../composants/Pastille'
 import type { Genre as GenreIcone } from '../icones'
@@ -21,7 +20,6 @@ export function Historique() {
   const [du, setDu] = useState('')
   const [au, setAu] = useState('')
   const [aSupprimer, setASupprimer] = useState<LigneJournal | null>(null)
-  const [enEdition, setEnEdition] = useState<string | null>(null)
 
   const lignes = journal(d)
     .filter((l) => !l.supprime_le)
@@ -76,14 +74,8 @@ export function Historique() {
           <div className={TEINTE_MONTANT[l.genre]}>{l.detail}</div>
           <div className="ligne" style={{ padding: 0 }}>
             <span className="discret">par {l.auteur}</span>
-            <span style={{ display: 'flex', gap: 16 }}>
-              {l.table === 'transactions' && <button className="lien" onClick={() => setEnEdition(l.id)}>Modifier</button>}
-              <button className="lien" onClick={() => setASupprimer(l)}>Supprimer</button>
-            </span>
+            <button className="lien" onClick={() => setASupprimer(l)}>Supprimer</button>
           </div>
-          {enEdition === l.id && l.table === 'transactions' && (
-            <ModifierTransaction t={d.transactions.find((t) => t.id === l.id)!} onFini={() => setEnEdition(null)} />
-          )}
         </article>
       ))}
 
