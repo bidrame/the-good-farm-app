@@ -15,7 +15,8 @@ export const MODES: [ModePaiement, string][] = [
 
 const NB_HISTORIQUE = 30
 
-function FormulairePaiement({ clientId, soldeActuel, onFini }: { clientId: string; soldeActuel: number; onFini: () => void }) {
+/** Paiement reçu d'un client (par défaut) ou versé à un fournisseur. */
+export function FormulairePaiement({ clientId, soldeActuel, onFini, sens = 'client' }: { clientId: string; soldeActuel: number; onFini: () => void; sens?: 'client' | 'fournisseur' }) {
   const { enregistrer } = useDonnees()
   const [montant, setMontant] = useState<number | null>(null)
   const [mode, setMode] = useState<ModePaiement>('especes')
@@ -30,7 +31,7 @@ function FormulairePaiement({ clientId, soldeActuel, onFini }: { clientId: strin
     if (enCours) return
     setEnCours(true)
     try {
-      await enregistrer('paiements', { id, client_id: clientId, montant, mode, date })
+      await enregistrer('paiements', { id, client_id: clientId, montant, mode, date, sens })
       vibrer()
       setEtape('fait')
     } finally {
@@ -39,7 +40,7 @@ function FormulairePaiement({ clientId, soldeActuel, onFini }: { clientId: strin
   }
 
   if (etape === 'fait')
-    return <Reussite message="Paiement enregistré" detail={`${formatFCFA(montant ?? 0)} reçus`} action="Fermer" onAction={onFini} />
+    return <Reussite message="Paiement enregistré" detail={`${formatFCFA(montant ?? 0)} ${sens === 'client' ? 'reçus' : 'versés'}`} action="Fermer" onAction={onFini} />
 
   if (etape === 'recap')
     return (
@@ -48,9 +49,9 @@ function FormulairePaiement({ clientId, soldeActuel, onFini }: { clientId: strin
         lignes={[
           ['Date', formatDate(date)],
           ['Mode', MODES.find((m) => m[0] === mode)?.[1] ?? mode],
-          ['Nouveau solde', nouveauSolde >= 0 ? formatFCFA(nouveauSolde) : `Avance de ${formatFCFA(-nouveauSolde)}`],
+          [sens === 'client' ? 'Nouveau solde' : 'Reste à payer', nouveauSolde >= 0 ? formatFCFA(nouveauSolde) : `Avance de ${formatFCFA(-nouveauSolde)}`],
         ]}
-        total={['Montant reçu', formatFCFA(montant ?? 0)]}
+        total={[sens === 'client' ? 'Montant reçu' : 'Montant versé', formatFCFA(montant ?? 0)]}
         onModifier={() => setEtape('formulaire')}
         onValider={valider}
         enCours={enCours}

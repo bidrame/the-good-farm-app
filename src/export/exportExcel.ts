@@ -3,6 +3,7 @@ import type { Donnees } from '../data/useDonnees'
 import { LIBELLE_PHASE, ageSemaines, effectifActuel, effectifPresent, phase } from '../lib/calculs/bandes'
 import { bilanMensuel } from '../lib/calculs/bilans'
 import { soldesClients } from '../lib/calculs/credits'
+import { dettesFournisseurs } from '../lib/calculs/dettes'
 import { OEUFS_PAR_PLATEAU, estProduitOeufs } from '../lib/calculs/oeufs'
 import { tauxPonte } from '../lib/calculs/ponte'
 import type { DateISO } from '../lib/types'
@@ -48,16 +49,21 @@ export function construireClasseur(d: Donnees, ref: DateISO): XLSX.WorkBook {
   })), ['Date', 'Type', 'Client', 'Produit', 'Prix unitaire', 'Quantité', 'Œufs par unité', 'Montant', 'Montant payé', 'Reste', 'Observation', 'Saisi par']), 'Transactions')
 
   XLSX.utils.book_append_sheet(wb, feuille(d.paiements.filter((p) => !p.supprime_le).sort((a, b) => b.date.localeCompare(a.date)).map((p) => ({
-    Date: dateExcel(p.date), Client: nom(d.clients, p.client_id), Montant: p.montant, Mode: p.mode, Observation: p.observation ?? '',
-  })), ['Date', 'Client', 'Montant', 'Mode', 'Observation']), 'Paiements')
+    Date: dateExcel(p.date), Sens: p.sens === 'fournisseur' ? 'Fournisseur' : 'Client', Nom: nom(d.clients, p.client_id),
+    Montant: p.montant, Mode: p.mode, Observation: p.observation ?? '',
+  })), ['Date', 'Sens', 'Nom', 'Montant', 'Mode', 'Observation']), 'Paiements')
 
   XLSX.utils.book_append_sheet(wb, feuille(soldesClients(d.clients, d.transactions, d.paiements).map((s) => ({
     Client: s.client.nom, Solde: s.solde,
   })), ['Client', 'Solde']), 'Crédits clients')
 
+  XLSX.utils.book_append_sheet(wb, feuille(dettesFournisseurs(d.clients, d.transactions, d.paiements, ref).lignes.map((l) => ({
+    Fournisseur: l.fournisseur.nom, 'Reste à payer': l.du, 'Depuis le': dateExcel(l.depuis), Jours: l.jours,
+  })), ['Fournisseur', 'Reste à payer', 'Depuis le', 'Jours']), 'Dettes fournisseurs')
+
   XLSX.utils.book_append_sheet(wb, feuille(d.bandes.filter((b) => !b.supprime_le).sort((a, b) => a.nom.localeCompare(b.nom)).map((b) => ({
     Bande: b.nom, Box: b.box, 'Née le': dateExcel(b.date_naissance), 'Effectif initial': b.effectif_initial,
-    'Effectif actuel': effectifActuel(b, d.ponte), 'Âge (sem)': ageSemaines(b, ref),
+    'Effectif actuel': effectifActuel(b, d.ponte, undefined, d.recensements), 'Âge (sem)': ageSemaines(b, ref),
     Phase: b.date_reforme ? 'Réformée' : LIBELLE_PHASE[phase(ageSemaines(b, ref))], 'Réformée le': dateExcel(b.date_reforme),
     Ouvrier: nom(d.ouvriers, b.ouvrier_id),
   })), ['Bande', 'Box', 'Née le', 'Effectif initial', 'Effectif actuel', 'Âge (sem)', 'Phase', 'Réformée le', 'Ouvrier']), 'Bandes')
@@ -66,7 +72,7 @@ export function construireClasseur(d: Donnees, ref: DateISO): XLSX.WorkBook {
     const b = d.bandes.find((x) => x.id === p.bande_id)
     return {
       Date: dateExcel(p.date), Bande: b?.nom ?? '', 'Œufs collectés': p.oeufs_collectes, 'Œufs perdus': p.oeufs_perdus,
-      Mortalité: p.mortalite, 'Aliment (kg)': p.aliment_kg, 'Taux de ponte': b ? Math.round(tauxPonte(p.oeufs_collectes, effectifPresent(b, d.ponte, p.date)) * 1000) / 1000 : null,
+      Mortalité: p.mortalite, 'Aliment (kg)': p.aliment_kg, 'Taux de ponte': b ? Math.round(tauxPonte(p.oeufs_collectes, effectifPresent(b, d.ponte, p.date, d.recensements)) * 1000) / 1000 : null,
       Observation: p.observation ?? '',
     }
   }), ['Date', 'Bande', 'Œufs collectés', 'Œufs perdus', 'Mortalité', 'Aliment (kg)', 'Taux de ponte', 'Observation']), 'Ponte')

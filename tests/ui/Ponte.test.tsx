@@ -30,20 +30,27 @@ describe('Ponte du jour', () => {
     expect(screen.getAllByRole('group').map((g) => g.getAttribute('aria-label'))).toEqual(['BANDE 3', 'BANDE 4', 'BANDE 5', 'BANDE 6'])
   })
 
-  it('compte en plateaux de 30 par défaut, calcule le taux en direct et le colore', async () => {
+  it('montre d’abord les œufs ramassés, et le taux seulement comme estimation', async () => {
     const { u } = afficher()
     const c = carte('BANDE 4')
     await u.type(within(c).getByLabelText('Plateaux de 30'), '16')
     await u.type(within(c).getByLabelText('+ œufs'), '24')
-    const taux = within(c).getByTestId('taux')
-    expect(taux).toHaveTextContent('88 %')
-    expect(taux).toHaveClass('ok')
+    expect(within(c).getByTestId('oeufs')).toHaveTextContent('504 œufs')
+    expect(within(c).getByTestId('taux')).toHaveTextContent('taux estimé 88 %')
   })
 
-  it('colore en rouge une ponte très en dessous de l’attendu', async () => {
-    const { u } = afficher()
-    await u.type(within(carte('BANDE 4')).getByLabelText('Plateaux de 30'), '5')
-    expect(within(carte('BANDE 4')).getByTestId('taux')).toHaveClass('mauvais')
+  it('compare les œufs à la moyenne des 7 derniers jours de la bande', async () => {
+    const avant = Array.from({ length: 7 }, (_, i) => ponte('b4', `2026-10-${24 + i}`, { oeufs_collectes: 500 }))
+    const { u } = afficher(avant)
+    await u.type(within(carte('BANDE 4')).getByLabelText('Plateaux de 30'), '13')
+    const t = within(carte('BANDE 4')).getByTestId('tendance')
+    expect(esp(t.textContent)).toBe('▼ 22 % par rapport à sa moyenne de 7 jours (500)')
+    expect(t).toHaveClass('mauvais')
+  })
+
+  it('rend la mortalité facultative', () => {
+    afficher()
+    expect(within(carte('BANDE 4')).getByLabelText('Morts (facultatif)')).toBeInTheDocument()
   })
 
   it('peut compter en cartons de 12 plateaux', async () => {
@@ -61,7 +68,7 @@ describe('Ponte du jour', () => {
     await u.type(within(c).getByLabelText('Plateaux de 30'), '16')
     await u.type(within(c).getByLabelText('+ œufs'), '24')
     await u.type(within(c).getByLabelText('Perdus'), '6')
-    await u.type(within(c).getByLabelText('Morts'), '1')
+    await u.type(within(c).getByLabelText('Morts (facultatif)'), '1')
     await u.type(within(c).getByLabelText('Aliment (kg)'), '65')
     await continuer(u)
     const recap = screen.getByRole('region', { name: 'Récapitulatif' })

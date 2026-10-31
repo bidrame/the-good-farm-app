@@ -43,8 +43,16 @@ describe('Accueil', () => {
     afficher()
     const zone = screen.getByRole('region', { name: 'Ponte d’hier' })
     expect(esp(zone.textContent)).toContain('BANDE 4')
-    expect(esp(zone.textContent)).toContain('80 %')
+    expect(esp(zone.textContent)).toContain('520 œufs')
     expect(esp(zone.textContent)).toContain('17 plateaux + 10')
+  })
+
+  it('compare la ferme à sa moyenne de 7 jours', () => {
+    vi.setSystemTime(new Date('2026-10-31T10:00:00'))
+    const d = ferme()
+    d.ponte = [...Array.from({ length: 7 }, (_, i) => ponte('b4', `2026-10-${23 + i}`, { oeufs_collectes: 400 })), ponte('b4', '2026-10-30', { oeufs_collectes: 440 })]
+    render(<DonneesFixes donnees={d}><MemoryRouter><Accueil /></MemoryRouter></DonneesFixes>)
+    expect(esp(screen.getByTestId('evolution-ferme').textContent)).toBe('▲ 10 % par rapport à la moyenne de 7 jours')
   })
 
   it('affiche les alertes, les plus graves d’abord', () => {
@@ -71,6 +79,16 @@ describe('Accueil', () => {
   it('invite à faire l’inventaire quand le stock n’est pas encore connu', () => {
     afficher()
     expect(screen.getByRole('link', { name: /Faire l’inventaire/ })).toHaveAttribute('href', '/reglages')
+  })
+
+  it('montre ce qu’il reste à payer aux fournisseurs et alerte sur une dette ancienne', () => {
+    vi.setSystemTime(new Date('2026-10-31T10:00:00'))
+    const d = ferme()
+    d.clients!.push({ id: 'f-sow', nom: 'Aliment Sow' })
+    d.transactions!.push(tx({ id: 'dette', date: '2026-09-01', type: 'depense', client_id: 'f-sow', produit_id: 'p-alim', prix_unitaire: 80000, montant_paye: 0 }))
+    render(<DonneesFixes donnees={d}><MemoryRouter><Accueil /></MemoryRouter></DonneesFixes>)
+    expect(esp(carte('À payer').textContent)).toContain('80 000 F')
+    expect(screen.getAllByRole('status').some((a) => esp(a.textContent).includes('Aliment Sow : 80 000 F à payer depuis 60 jours'))).toBe(true)
   })
 
   it('signale les saisies en attente d’envoi', () => {

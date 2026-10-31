@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useDonnees } from '../../data/useDonnees'
-import { tauxMoyen } from '../../lib/calculs/alertes'
 import { LIBELLE_PHASE, ageSemaines, effectifActuel, phase } from '../../lib/calculs/bandes'
 import { ajouterJours, aujourdhui, formatDate } from '../../lib/format'
 import type { Bande, Box } from '../../lib/types'
@@ -10,10 +9,11 @@ import { ChampMontant } from '../composants/communs'
 const BOXES: Box[] = [1, 2, 3, 4]
 
 function LigneBande({ b }: { b: Bande }) {
-  const { ponte } = useDonnees()
+  const { ponte, recensements } = useDonnees()
   const ref = aujourdhui()
   const semaines = ageSemaines(b, ref)
-  const taux = b.date_reforme ? null : tauxMoyen(b, ponte, ajouterJours(ref, -6), ref)
+  const recents = b.date_reforme ? [] : ponte.filter((p) => p.bande_id === b.id && !p.supprime_le && p.date >= ajouterJours(ref, -6) && p.date <= ref)
+  const oeufsJour = recents.length ? Math.round(recents.reduce((s, p) => s + p.oeufs_collectes, 0) / recents.length) : null
   return (
     <Link to={`/bandes/${b.id}`} className="carte" style={{ display: 'block', color: 'inherit', textDecoration: 'none' }}>
       <div className="ligne" style={{ padding: 0 }}>
@@ -21,8 +21,8 @@ function LigneBande({ b }: { b: Bande }) {
         <span className="discret">box {b.box}</span>
       </div>
       <div className="discret">
-        {semaines} sem. · {b.date_reforme ? `réformée le ${formatDate(b.date_reforme)}` : LIBELLE_PHASE[phase(semaines)]} · {effectifActuel(b, ponte)} poules
-        {taux != null && ` · ${Math.round(taux * 100)} % sur 7 j`}
+        {oeufsJour != null && <strong style={{ color: 'var(--texte)' }}>{oeufsJour} œufs/jour · </strong>}
+        {semaines} sem. · {b.date_reforme ? `réformée le ${formatDate(b.date_reforme)}` : LIBELLE_PHASE[phase(semaines)]} · ≈ {effectifActuel(b, ponte, undefined, recensements)} poules
       </div>
     </Link>
   )

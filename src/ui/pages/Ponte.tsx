@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useDonnees } from '../../data/useDonnees'
 import { ageSemaines, bandesEnProduction, effectifPresent } from '../../lib/calculs/bandes'
-import { couleurTaux } from '../../lib/calculs/couleur'
 import { CONDITIONNEMENTS_DEFAUT, OEUFS_PAR_PLATEAU, decomposer, enOeufs } from '../../lib/calculs/oeufs'
-import { tauxAttendu, tauxPonte } from '../../lib/calculs/ponte'
+import { tauxPonte } from '../../lib/calculs/ponte'
+import { couleurTendance, moyenneOeufs7 } from '../../lib/calculs/suiviOeufs'
 import { ajouterJours, aujourdhui, formatDate } from '../../lib/format'
 import type { Bande, Conditionnement, Ponte as TPonte } from '../../lib/types'
 import { vibrer } from '../composants/animations'
@@ -26,32 +26,42 @@ function depuisPonte(p?: TPonte): Saisie {
   return { id: p.id, oeufs: p.oeufs_collectes, perdus: p.oeufs_perdus, morts: p.mortalite, aliment: p.aliment_kg, observation: p.observation ?? '' }
 }
 
-function CartePonte({ bande, effectif, attendu, semaines, saisie, cond, onChange }: {
-  bande: Bande; effectif: number; attendu: number; semaines: number; saisie: Saisie; cond: Conditionnement; onChange: (s: Saisie) => void
+function CartePonte({ bande, effectif, moyenne, semaines, saisie, cond, seuilBaisse, onChange }: {
+  bande: Bande; effectif: number; moyenne: number | null; semaines: number; saisie: Saisie; cond: Conditionnement; seuilBaisse?: number; onChange: (s: Saisie) => void
 }) {
   const maj = (p: Partial<Saisie>) => onChange({ ...saisie, ...p })
   const n = saisie.oeufs ?? 0
   const { lots, restants } = decomposer(n, cond.oeufs)
   const vide = saisie.oeufs == null
   const taux = tauxPonte(n, effectif)
-  const classe = couleurTaux(taux, attendu)
+  const ecart = moyenne ? (n - moyenne) / moyenne : null
+  const classe = ecart == null ? 'ok' : couleurTendance(ecart, seuilBaisse)
+  const plateaux = decomposer(n, OEUFS_PAR_PLATEAU)
   const changerLots = (v: number | null) => maj({ oeufs: v == null && restants === 0 ? null : enOeufs(v ?? 0, cond.oeufs, vide ? 0 : restants) })
   const changerRestants = (v: number | null) => maj({ oeufs: v == null && lots === 0 ? null : enOeufs(vide ? 0 : lots, cond.oeufs, v ?? 0) })
   return (
     <div className="carte" role="group" aria-label={bande.nom}>
-      <div className="ligne" style={{ padding: 0 }}>
+      <div className="ligne" style={{ padding: 0, alignItems: 'baseline' }}>
         <strong style={{ fontSize: 17 }}>{bande.nom} <span className="discret">· box {bande.box}</span></strong>
-        {!estVide(saisie) && <span data-testid="taux" className={classe} style={{ fontWeight: 800, fontSize: 18 }}>{Math.round(taux * 100)} %</span>}
+        {!vide && <span data-testid="oeufs" style={{ fontWeight: 800, fontSize: 20 }}>{n} œufs</span>}
       </div>
-      <div className="discret" style={{ marginBottom: 8 }}>{effectif} poules · {semaines} sem. · attendu {Math.round(attendu * 100)} %</div>
-      {!estVide(saisie) && <div className={`jauge ${classe === 'ok' ? '' : classe}`} style={{ marginBottom: 10 }}><span style={{ width: `${Math.min(100, Math.round(taux * 100))}%` }} /></div>}
+      <div className="discret" style={{ marginBottom: 6 }}>
+        {semaines} sem.{moyenne != null && ` · moyenne 7 j : ${Math.round(moyenne)} œufs`}
+        {!vide && ` · ${plateaux.lots} plateaux${plateaux.restants ? ` + ${plateaux.restants}` : ''}`}
+      </div>
+      {!vide && ecart != null && (
+        <div data-testid="tendance" className={classe} style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
+          {ecart >= 0 ? '▲' : '▼'} {Math.abs(Math.round(ecart * 100))} % par rapport à sa moyenne de 7 jours ({Math.round(moyenne!)})
+        </div>
+      )}
+      {!vide && <div data-testid="taux" className="discret" style={{ marginBottom: 8 }}>taux estimé {Math.round(taux * 100)} % (≈ {effectif} poules)</div>}
       <div className={cond.oeufs > 1 ? 'grille2' : ''}>
         <ChampMontant libelle={cond.oeufs > 1 ? pluriel(cond.nom) : 'Œufs'} valeur={vide ? null : lots} onChange={changerLots} />
         {cond.oeufs > 1 && <ChampMontant libelle="+ œufs" valeur={vide ? null : restants} onChange={changerRestants} />}
       </div>
       <div className="grille3">
         <ChampMontant libelle="Perdus" valeur={saisie.perdus} onChange={(v) => maj({ perdus: v })} />
-        <ChampMontant libelle="Morts" valeur={saisie.morts} onChange={(v) => maj({ morts: v })} />
+        <ChampMontant libelle="Morts (facultatif)" valeur={saisie.morts} onChange={(v) => maj({ morts: v })} />
         <ChampMontant libelle="Aliment (kg)" valeur={saisie.aliment} onChange={(v) => maj({ aliment: v })} />
       </div>
       {n > 0 && <div className="discret">Total : {n} œufs</div>}
@@ -60,8 +70,7 @@ function CartePonte({ bande, effectif, attendu, semaines, saisie, cond, onChange
 }
 
 function SaisieDuJour({ date, cond }: { date: string; cond: Conditionnement }) {
-  const { bandes, ponte, reglages, enregistrer } = useDonnees()
-  const courbe = reglages[0]?.courbe_attendue ?? undefined
+  const { bandes, ponte, recensements, reglages, enregistrer } = useDonnees()
   const enProd = bandesEnProduction(bandes, ponte, date)
   // Seules les cartes modifiées ici sont gardées en état ; les autres suivent les données (y compris celles qui arrivent après l'ouverture).
   const [modifiees, setModifiees] = useState<Record<string, Saisie>>({})
@@ -76,7 +85,7 @@ function SaisieDuJour({ date, cond }: { date: string; cond: Conditionnement }) {
   const totalJour = enProd.reduce((s, b) => s + (saisieDe(b.id).oeufs ?? 0), 0)
 
   function continuer(forcer = false) {
-    const tropDOeufs = aEnregistrer.filter((b) => (modifiees[b.id].oeufs ?? 0) > effectifPresent(b, ponte, date)).map((b) => b.nom)
+    const tropDOeufs = aEnregistrer.filter((b) => (modifiees[b.id].oeufs ?? 0) > effectifPresent(b, ponte, date, recensements)).map((b) => b.nom)
     if (!forcer && tropDOeufs.length > 0) return setAConfirmer(tropDOeufs)
     setAConfirmer(null)
     if (aEnregistrer.length > 0) setEtape('recap')
@@ -132,11 +141,11 @@ function SaisieDuJour({ date, cond }: { date: string; cond: Conditionnement }) {
         titre={`Ponte du ${formatDate(date)}`}
         lignes={aEnregistrer.map((b) => {
           const s = modifiees[b.id]
-          const taux = Math.round(tauxPonte(s.oeufs ?? 0, effectifPresent(b, ponte, date)) * 100)
+          const taux = Math.round(tauxPonte(s.oeufs ?? 0, effectifPresent(b, ponte, date, recensements)) * 100)
           const pl = (n: number, mot: string) => `${n} ${mot}${n > 1 ? 's' : ''}`
           const extra = [s.perdus ? pl(s.perdus, 'perdu') : '', s.morts ? pl(s.morts, 'mort') : '', s.aliment != null ? `${s.aliment} kg` : ''].filter(Boolean).join(' · ')
           const { lots, restants } = decomposer(s.oeufs ?? 0, OEUFS_PAR_PLATEAU)
-          return [`${b.nom}`, `${s.oeufs ?? 0} œufs (${lots} plateaux${restants ? ` + ${restants}` : ''}) · ${taux} %${extra ? ` · ${extra}` : ''}`] as [string, string]
+          return [`${b.nom}`, `${s.oeufs ?? 0} œufs (${lots} plateaux${restants ? ` + ${restants}` : ''}) · taux estimé ${taux} %${extra ? ` · ${extra}` : ''}`] as [string, string]
         })}
         total={['Ferme', `${totalJour} œufs`]}
         onModifier={() => setEtape('cartes')}
@@ -152,9 +161,10 @@ function SaisieDuJour({ date, cond }: { date: string; cond: Conditionnement }) {
           key={b.id}
           bande={b}
           cond={cond}
-          effectif={effectifPresent(b, ponte, date)}
+          effectif={effectifPresent(b, ponte, date, recensements)}
           semaines={ageSemaines(b, date)}
-          attendu={tauxAttendu(ageSemaines(b, date), courbe)}
+          moyenne={moyenneOeufs7(b.id, ponte, date)}
+          seuilBaisse={reglages[0]?.seuils?.baisse_pct}
           saisie={saisieDe(b.id)}
           onChange={(s) => setModifiees((x) => ({ ...x, [b.id]: s }))}
         />

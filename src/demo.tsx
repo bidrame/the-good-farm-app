@@ -44,7 +44,7 @@ function donneesDemo(): Donnees {
     if (j % 7 === 0) transactions.push({ id: `a${j}`, date: ajouterJours(ref, -j), type: 'depense', client_id: null, produit_id: 'p5', prix_unitaire: 15500, quantite: 20, montant: 310000, montant_paye: 0 })
     if (j % 30 === 0) transactions.push({ id: `s${j}`, date: ajouterJours(ref, -j), type: 'depense', client_id: null, produit_id: 'p6', prix_unitaire: 450000, quantite: 1, montant: 450000, montant_paye: 0 })
   }
-  return { ...DONNEES_VIDES, produits, clients, bandes, ponte, transactions, profils: [{ id: 'demo', prenom: 'Démo' }], reglages: [{ id: 1, derniere_sauvegarde: ajouterJours(ref, -9), stock_depart: { date: ajouterJours(ref, -3), oeufs: 1500 } }] }
+  return { ...DONNEES_VIDES, produits, clients, bandes, ponte, transactions, recensements: [{ id: 'r1', bande_id: 'b5', date: ajouterJours(ref, -10), effectif: 600 }], profils: [{ id: 'demo', prenom: 'Démo' }], reglages: [{ id: 1, derniere_sauvegarde: ajouterJours(ref, -9), stock_depart: { date: ajouterJours(ref, -3), oeufs: 1500 } }] }
 }
 
 export function Demo() {

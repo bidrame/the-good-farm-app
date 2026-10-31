@@ -47,7 +47,10 @@ export type ModePaiement = 'especes' | 'wave' | 'orange_money' | 'virement' | 'a
 
 export interface Paiement extends Audit {
   id: string
+  /** Client ou fournisseur (même table). */
   client_id: string
+  /** Absent = paiement reçu d'un client. */
+  sens?: 'client' | 'fournisseur'
   date: DateISO
   montant: number
   mode: ModePaiement
@@ -73,6 +76,15 @@ export interface Bande extends Audit {
   observations?: string | null
 }
 
+/** Recomptage des poules d'une bande : l'effectif repart de ce nombre le lendemain. */
+export interface Recensement extends Audit {
+  id: string
+  bande_id: string
+  date: DateISO
+  effectif: number
+  observation?: string | null
+}
+
 export interface Ponte extends Audit {
   id: string
   date: DateISO
@@ -85,9 +97,11 @@ export interface Ponte extends Audit {
 }
 
 export interface Seuils {
-  baisse_points: number
+  /** Baisse des œufs d'une bande (en %) par rapport à sa moyenne des 7 jours précédents. */
+  baisse_pct: number
   mortalite_pour_mille: number
   jours_sauvegarde: number
+  jours_dette: number
 }
 
 export interface Conditionnement {

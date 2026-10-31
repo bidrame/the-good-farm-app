@@ -15,6 +15,11 @@ function historique(avant: number, apres: number): Ponte[] {
   })
 }
 
+/** 7 jours à `normale` œufs puis la veille de REF à `dernier`. */
+function chute(normale: number, dernier: number): Ponte[] {
+  return Array.from({ length: 8 }, (_, i) => ponte('b4', ajouterJours(REF, i - 8), { oeufs_collectes: i < 7 ? normale : dernier }))
+}
+
 const base = { ref: REF, heure: 10, bandes: [b4], pontes: historique(0.83, 0.83), derniereSauvegarde: REF }
 
 describe('calculerAlertes', () => {
@@ -27,11 +32,16 @@ describe('calculerAlertes', () => {
     const avecJour = [...base.pontes, ponte('b4', REF, { oeufs_collectes: 500 })]
     expect(codes(calculerAlertes({ ...base, heure: 19, pontes: avecJour }))).not.toContain('ponte_non_saisie')
   })
-  it('signale une baisse de plus de 10 points sur 7 jours', () => {
-    const a = calculerAlertes({ ...base, pontes: historique(0.83, 0.71) })
+  it('signale une baisse des œufs de plus de 15 % par rapport à la moyenne de la bande', () => {
+    const a = calculerAlertes({ ...base, pontes: chute(500, 400) })
     expect(codes(a)).toEqual(['ponte_en_baisse'])
     expect(a[0].bande_id).toBe('b4')
-    expect(codes(calculerAlertes({ ...base, pontes: historique(0.83, 0.75) }))).toEqual([])
+    expect(a[0].message).toBe('BANDE 4 : 400 œufs le 30/10, −20 % par rapport à sa moyenne de 7 jours (500)')
+    expect(codes(calculerAlertes({ ...base, pontes: chute(500, 440) }))).toEqual([])
+  })
+  it('ne dépend pas de l’effectif (mortalité mal notée)', () => {
+    const p = chute(500, 400).map((x) => ({ ...x, mortalite: 0 }))
+    expect(codes(calculerAlertes({ ...base, bandes: [{ ...b4, effectif_initial: 99999 }], pontes: p }))).toEqual(['ponte_en_baisse'])
   })
   it('signale une mortalité au-dessus de 0,5 % de l’effectif (hier ou aujourd’hui)', () => {
     const p = [...base.pontes.slice(0, -1), { ...base.pontes[13], mortalite: 4 }]
@@ -52,8 +62,8 @@ describe('calculerAlertes', () => {
     expect(r?.niveau).toBe('attention')
   })
   it('utilise les seuils réglés par l’utilisateur', () => {
-    const seuils = { baisse_points: 15, mortalite_pour_mille: 5, jours_sauvegarde: 3 }
-    expect(codes(calculerAlertes({ ...base, pontes: historique(0.83, 0.71), seuils }))).toEqual([])
+    const seuils = { baisse_pct: 25, mortalite_pour_mille: 5, jours_sauvegarde: 3 }
+    expect(codes(calculerAlertes({ ...base, pontes: chute(500, 400), seuils }))).toEqual([])
     expect(codes(calculerAlertes({ ...base, derniereSauvegarde: '2026-10-27', seuils }))).toEqual(['sauvegarde'])
   })
   it('rappelle la sauvegarde au-delà de 7 jours', () => {
@@ -62,7 +72,7 @@ describe('calculerAlertes', () => {
     expect(codes(calculerAlertes({ ...base, derniereSauvegarde: '2026-10-25' }))).toEqual([])
   })
   it('classe les alertes danger, puis attention, puis info', () => {
-    const a = calculerAlertes({ ...base, heure: 19, derniereSauvegarde: null, pontes: historique(0.83, 0.6) })
+    const a = calculerAlertes({ ...base, heure: 19, derniereSauvegarde: null, pontes: chute(500, 300) })
     expect(a.map((x) => x.niveau)).toEqual(['danger', 'attention', 'info'])
   })
 })

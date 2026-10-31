@@ -3,6 +3,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { useDonnees } from '../../data/useDonnees'
 import { bilanAnnuel, bilanMensuel, classementClients, parProduit } from '../../lib/calculs/bilans'
 import { statsVentesOeufs } from '../../lib/calculs/oeufs'
+import { argentSorti } from '../../lib/calculs/dettes'
 import { aujourdhui, formatFCFA } from '../../lib/format'
 import { couleur } from '../couleurs'
 
@@ -25,7 +26,7 @@ function Tableau({ titre, entetes, lignes }: { titre: string; entetes: string[];
 }
 
 export function Rapports() {
-  const { transactions, produits, clients } = useDonnees()
+  const { transactions, produits, clients, paiements } = useDonnees()
   const [periode, setPeriode] = useState<Periode>('mois')
   const ref = aujourdhui()
   const prefixe = periode === 'mois' ? ref.slice(0, 7) : periode === 'annee' ? ref.slice(0, 4) : ''
@@ -68,6 +69,11 @@ export function Rapports() {
         <Tableau titre="Bilan par année" entetes={['Année', 'Ventes', 'Dépenses', 'Résultat', 'Marge']}
           lignes={bilanAnnuel(txs).map((l) => [l.periode, formatFCFA(l.ventes), formatFCFA(l.depenses), formatFCFA(l.resultat), l.ventes ? pct(l.resultat / l.ventes) : '—'])} />
       )}
+      <section aria-label="Trésorerie" className="carte">
+        <h2 style={{ marginTop: 0 }}>Trésorerie</h2>
+        <div className="ligne"><span className="discret">Argent réellement sorti</span><strong>{formatFCFA(argentSorti(transactions, paiements, prefixe))}</strong></div>
+        <p className="discret" style={{ margin: '4px 0 0' }}>Dépenses payées comptant et paiements aux fournisseurs, à la date où l’argent est parti.</p>
+      </section>
       <section aria-label="Œufs vendus" className="carte">
         <h2 style={{ marginTop: 0 }}>Œufs vendus</h2>
         <div className="ligne"><span className="discret">Œufs</span><strong>{oeufs.oeufs.toLocaleString('fr-FR')} œufs</strong></div>

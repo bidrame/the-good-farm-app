@@ -104,9 +104,10 @@ function Ouvriers() {
 }
 
 const CHAMPS_SEUILS: [keyof Seuils, string][] = [
-  ['baisse_points', 'Baisse de ponte signalée (points)'],
+  ['baisse_pct', 'Baisse d’œufs signalée (%)'],
   ['mortalite_pour_mille', 'Mortalité signalée (pour mille par jour)'],
   ['jours_sauvegarde', 'Rappel de sauvegarde (jours)'],
+  ['jours_dette', 'Dette fournisseur signalée après (jours)'],
 ]
 
 function SeuilsAlerte() {

@@ -1,16 +1,20 @@
-import { ajouterJours, formatDate, joursEntre } from '../format'
+import { ajouterJours, formatDate, formatFCFA, joursEntre } from '../format'
 import type { Bande, DateISO, Ponte, Seuils } from '../types'
 import { ageSemaines, bandesEnProduction, effectifPresent } from './bandes'
 import { tauxPonte } from './ponte'
+import { tendanceOeufs } from './suiviOeufs'
 
 export type Alerte = { niveau: 'info' | 'attention' | 'danger'; code: string; message: string; bande_id?: string }
 
-export const SEUILS_DEFAUT: Seuils = { baisse_points: 10, mortalite_pour_mille: 5, jours_sauvegarde: 7 }
+export const SEUILS_DEFAUT: Seuils = { baisse_pct: 15, mortalite_pour_mille: 5, jours_sauvegarde: 7, jours_dette: 30 }
 export const HEURE_RAPPEL_PONTE = 18
 export const SEMAINES_ALERTE_REFORME = 60
 export const SEMAINES_REFORME = 72
 
-type Contexte = { ref: DateISO; heure: number; bandes: Bande[]; pontes: Ponte[]; derniereSauvegarde: DateISO | null; seuils?: Partial<Seuils> | null }
+type Contexte = {
+  ref: DateISO; heure: number; bandes: Bande[]; pontes: Ponte[]; derniereSauvegarde: DateISO | null; seuils?: Partial<Seuils> | null
+  dettes?: { fournisseur: { nom: string }; du: number; jours: number | null }[]
+}
 
 const ORDRE = { danger: 0, attention: 1, info: 2 }
 
@@ -20,7 +24,7 @@ export function tauxMoyen(b: Bande, pontes: Ponte[], du: DateISO, au: DateISO): 
   return jours.reduce((s, p) => s + tauxPonte(p.oeufs_collectes, effectifPresent(b, pontes, p.date)), 0) / jours.length
 }
 
-export function calculerAlertes({ ref, heure, bandes, pontes, derniereSauvegarde, seuils }: Contexte): Alerte[] {
+export function calculerAlertes({ ref, heure, bandes, pontes, derniereSauvegarde, seuils, dettes = [] }: Contexte): Alerte[] {
   const s = { ...SEUILS_DEFAUT, ...seuils }
   const alertes: Alerte[] = []
   const enProd = bandesEnProduction(bandes, pontes, ref)
@@ -31,12 +35,13 @@ export function calculerAlertes({ ref, heure, bandes, pontes, derniereSauvegarde
     alertes.push({ niveau: 'danger', code: 'ponte_non_saisie', message: `Ponte du jour pas encore saisie (${manquantes.map((b) => b.nom).join(', ')})` })
 
   for (const b of enProd) {
-    const recent = tauxMoyen(b, pontes, ajouterJours(ref, -7), ajouterJours(ref, -1))
-    const avant = tauxMoyen(b, pontes, ajouterJours(ref, -14), ajouterJours(ref, -8))
-    if (recent != null && avant != null && avant - recent > s.baisse_points / 100)
+    // Basé sur les œufs ramassés (fiables), pas sur l'effectif (mortalité souvent mal notée).
+    const jour = [ref, ajouterJours(ref, -1)].find((d) => pontesVivantes.some((p) => p.bande_id === b.id && p.date === d))
+    const t = jour ? tendanceOeufs(b.id, pontes, jour) : null
+    if (jour && t && -t.ecart * 100 > s.baisse_pct)
       alertes.push({
         niveau: 'attention', code: 'ponte_en_baisse', bande_id: b.id,
-        message: `${b.nom} : ponte en baisse (${Math.round(avant * 100)} % → ${Math.round(recent * 100)} % sur 7 jours)`,
+        message: `${b.nom} : ${t.oeufs} œufs le ${formatDate(jour).slice(0, 5)}, −${Math.round(-t.ecart * 100)} % par rapport à sa moyenne de 7 jours (${Math.round(t.moyenne)})`,
       })
 
     for (const date of [ref, ajouterJours(ref, -1)]) {
@@ -61,6 +66,10 @@ export function calculerAlertes({ ref, heure, bandes, pontes, derniereSauvegarde
           },
     )
   }
+
+  for (const d of dettes)
+    if (d.du > 0 && d.jours != null && d.jours > s.jours_dette)
+      alertes.push({ niveau: 'attention', code: 'dette_ancienne', message: `${d.fournisseur.nom} : ${formatFCFA(d.du)} à payer depuis ${d.jours} jours` })
 
   if (!derniereSauvegarde || joursEntre(derniereSauvegarde, ref) > s.jours_sauvegarde)
     alertes.push({ niveau: 'info', code: 'sauvegarde', message: 'Pensez à exporter la sauvegarde Excel' })

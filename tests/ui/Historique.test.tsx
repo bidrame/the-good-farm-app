@@ -75,6 +75,10 @@ describe('Historique', () => {
     expect(within(f).getByText(/ne peut pas dépasser/)).toBeInTheDocument()
     expect(enregistrer).not.toHaveBeenCalled()
   })
+  it('distingue les paiements aux fournisseurs', () => {
+    afficher(<Historique />, (d) => { d.paiements = [{ id: 'pf', client_id: 'c-ass', sens: 'fournisseur', date: '2026-10-30', montant: 5000, mode: 'wave' }] })
+    expect(screen.getByText('Paiement fournisseur · Ass')).toBeInTheDocument()
+  })
   it('masque les lignes supprimées', () => {
     afficher(<Historique />, (d) => { d.transactions![6].supprime_le = '2026-10-30T10:00:00Z' })
     expect(lignes()).toHaveLength(6)
@@ -126,14 +130,23 @@ describe('Réglages : unités et seuils', () => {
     await u.selectOptions(screen.getByLabelText('Unité de Poulets frais'), 'kg')
     expect(enregistrer).toHaveBeenCalledWith('produits', expect.objectContaining({ id: 'p-pf', unite: 'kg' }))
   })
+  it('règle le seuil d’alerte des dettes fournisseurs', async () => {
+    const { u, enregistrer } = afficher(<Reglages />)
+    const champ = screen.getByLabelText('Dette fournisseur signalée après (jours)')
+    expect(champ).toHaveValue('30')
+    await u.clear(champ)
+    await u.type(champ, '45')
+    await u.click(screen.getByRole('button', { name: 'Enregistrer les seuils' }))
+    expect(enregistrer).toHaveBeenCalledWith('reglages', { id: 1, seuils: expect.objectContaining({ jours_dette: 45 }) })
+  })
   it('modifie les seuils d’alerte', async () => {
     const { u, enregistrer } = afficher(<Reglages />)
-    const champ = screen.getByLabelText('Baisse de ponte signalée (points)')
-    expect(champ).toHaveValue('10')
+    const champ = screen.getByLabelText('Baisse d’œufs signalée (%)')
+    expect(champ).toHaveValue('15')
     await u.clear(champ)
-    await u.type(champ, '8')
+    await u.type(champ, '20')
     await u.click(screen.getByRole('button', { name: 'Enregistrer les seuils' }))
-    expect(enregistrer).toHaveBeenCalledWith('reglages', { id: 1, seuils: { baisse_points: 8, mortalite_pour_mille: 5, jours_sauvegarde: 7 } })
+    expect(enregistrer).toHaveBeenCalledWith('reglages', { id: 1, seuils: { baisse_pct: 20, mortalite_pour_mille: 5, jours_sauvegarde: 7, jours_dette: 30 } })
   })
 })
 

@@ -61,7 +61,8 @@ export function Saisir() {
   const oeufs = f.type === 'vente' && estProduitOeufs(produit)
   const cond = conditionnements.find((c) => c.oeufs === f.oeufs_par_unite) ?? { nom: `Lot de ${f.oeufs_par_unite}`, oeufs: f.oeufs_par_unite }
   const montant = (f.quantite ?? 0) * (f.prix_unitaire ?? 0)
-  const montantPaye = f.type === 'depense' ? 0 : f.paye === 'tout' ? montant : f.paye === 'rien' ? 0 : f.montant_paye ?? 0
+  const montantPaye = f.paye === 'tout' ? montant : f.paye === 'rien' ? 0 : f.montant_paye ?? 0
+  const reste = montant - montantPaye
 
   function prixPropose(clientId: string | null, produitId: string | null, taille: number) {
     if (!produitId) return null
@@ -121,7 +122,7 @@ export function Saisir() {
       <main>
         <Reussite
           message={f.type === 'vente' ? 'Vente enregistrée' : 'Dépense enregistrée'}
-          detail={`${formatFCFA(montant)}${f.type === 'vente' && montantPaye < montant ? ` · reste ${formatFCFA(montant - montantPaye)} à encaisser` : ''}`}
+          detail={`${formatFCFA(montant)}${reste > 0 ? ` · reste ${formatFCFA(reste)} à ${f.type === 'vente' ? 'encaisser' : 'payer'}` : ''}`}
           action="Nouvelle saisie"
           onAction={() => { effacer(); setEtape('formulaire'); setErreurs({}) }}
         />
@@ -140,7 +141,8 @@ export function Saisir() {
             ['Produit', produit?.nom ?? ''],
             ['Quantité', oeufs ? `${f.quantite} × ${cond.nom}` : `${f.quantite} × ${formatFCFA(f.prix_unitaire ?? 0)}`],
             ...(oeufs ? [['Œufs', `${(f.quantite ?? 0) * cond.oeufs} œufs`] as [string, string], ['Prix', `${formatFCFA(f.prix_unitaire ?? 0)} / ${cond.nom.toLowerCase()}`] as [string, string]] : []),
-            ...(f.type === 'vente' ? [['Paiement', f.paye === 'tout' ? 'Payé' : f.paye === 'rien' ? 'À crédit' : `${formatFCFA(montantPaye)} payés, reste ${formatFCFA(montant - montantPaye)}`] as [string, string]] : []),
+            ['Paiement', f.paye === 'tout' ? 'Payé' : f.paye === 'rien' ? (f.type === 'vente' ? 'À crédit' : 'À payer plus tard') : `${formatFCFA(montantPaye)} payés`],
+            ...(reste > 0 ? [['Reste à payer', formatFCFA(reste)] as [string, string]] : []),
             ...(f.observation.trim() ? [['Observation', f.observation.trim()] as [string, string]] : []),
           ]}
           total={['Montant', formatFCFA(montant)]}
@@ -170,7 +172,7 @@ export function Saisir() {
       </label>
 
       <ChampClient
-        libelle={f.type === 'vente' ? 'Client' : 'Fournisseur (facultatif)'}
+        libelle={f.type === 'vente' ? 'Client' : f.paye === 'tout' ? 'Fournisseur (facultatif)' : 'Fournisseur'}
         clients={clients}
         valeur={f.client_id}
         onChange={choisirClient}
@@ -202,11 +204,11 @@ export function Saisir() {
         <span data-testid="montant">{formatFCFA(montant)}</span>
       </div>
 
-      {f.type === 'vente' && (
+      {(
         <>
           <span className="discret">Payé</span>
           <div className="grille3" style={{ margin: '5px 0 10px' }}>
-            {([['tout', 'Tout'], ['partie', 'Une partie'], ['rien', 'Rien (crédit)']] as const).map(([v, l]) => (
+            {([['tout', 'Tout'], ['partie', 'Une partie'], ['rien', f.type === 'vente' ? 'Rien (crédit)' : 'Rien (à payer)']] as const).map(([v, l]) => (
               <button key={v} type="button" className={f.paye === v ? 'choisi' : ''} onClick={() => maj({ paye: v })}>{l}</button>
             ))}
           </div>

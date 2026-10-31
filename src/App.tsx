@@ -11,6 +11,8 @@ import { Clients } from './ui/pages/Clients'
 import { Connexion } from './ui/pages/Connexion'
 import { Corbeille } from './ui/pages/Corbeille'
 import { Export } from './ui/pages/Export'
+import { FournisseurFiche } from './ui/pages/FournisseurFiche'
+import { Fournisseurs } from './ui/pages/Fournisseurs'
 import { Historique } from './ui/pages/Historique'
 import { Plus } from './ui/pages/Plus'
 import { Ponte } from './ui/pages/Ponte'
@@ -30,7 +32,7 @@ function expliquer(erreur: string): string {
 
 const NOM_TABLE: Record<string, string> = {
   transactions: 'vente ou dépense', paiements: 'paiement', ponte: 'ponte', bandes: 'bande', clients: 'client',
-  produits: 'produit', ouvriers: 'ouvrier', reglages: 'réglages', profils: 'profil',
+  produits: 'produit', ouvriers: 'ouvrier', reglages: 'réglages', profils: 'profil', recensements: 'recomptage',
 }
 
 function BandeauEtat() {
@@ -92,6 +94,8 @@ export function Pages() {
         <Route path="/plus" element={<Plus />} />
         <Route path="/clients" element={<Clients />} />
         <Route path="/clients/:id" element={<ClientFiche />} />
+        <Route path="/fournisseurs" element={<Fournisseurs />} />
+        <Route path="/fournisseurs/:id" element={<FournisseurFiche />} />
         <Route path="/rapports" element={<Rapports />} />
         <Route path="/historique" element={<Historique />} />
         <Route path="/corbeille" element={<Corbeille />} />

@@ -7,11 +7,13 @@ export function validerTransaction(t: Partial<Transaction>, ref: DateISO): Recor
   else if (t.date > ref) e.date = 'Date dans le futur'
   if (!t.produit_id) e.produit_id = 'Produit obligatoire'
   if (t.type === 'vente' && !t.client_id) e.client_id = 'Client obligatoire'
+  if (t.type === 'depense' && !t.client_id && t.montant != null && (t.montant_paye ?? 0) < t.montant)
+    e.client_id = 'Fournisseur obligatoire si tout n’est pas payé'
   if (!t.quantite || t.quantite <= 0) e.quantite = 'Quantité obligatoire'
   if (!t.prix_unitaire || t.prix_unitaire <= 0) e.prix_unitaire = 'Prix obligatoire'
   const paye = t.montant_paye ?? 0
   if (paye < 0) e.montant_paye = 'Montant payé invalide'
-  else if (t.type === 'vente' && t.montant != null && paye > t.montant)
+  else if (t.montant != null && paye > t.montant)
     e.montant_paye = `Le montant payé ne peut pas dépasser ${formatFCFA(t.montant)}`
   return e
 }
@@ -21,7 +23,9 @@ export function soldeClient(clientId: string, txs: Transaction[], paiements: Pai
   const du = txs
     .filter((t) => t.type === 'vente' && t.client_id === clientId && !t.supprime_le)
     .reduce((s, t) => s + t.montant - t.montant_paye, 0)
-  const paye = paiements.filter((p) => p.client_id === clientId && !p.supprime_le).reduce((s, p) => s + p.montant, 0)
+  const paye = paiements
+    .filter((p) => p.client_id === clientId && !p.supprime_le && (p.sens ?? 'client') === 'client')
+    .reduce((s, p) => s + p.montant, 0)
   return du - paye
 }
 

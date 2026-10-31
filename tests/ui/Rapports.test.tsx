@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { Rapports } from '../../src/ui/pages/Rapports'
 import { DonneesFixes } from '../../src/data/useDonnees'
 import { ferme } from '../fixtures/ferme'
-import { tx } from '../fixtures/tx'
+import { paiement, tx } from '../fixtures/tx'
 
 const esp = (s: string | null | undefined) => (s ?? '').replace(/\s/g, ' ')
 
@@ -16,6 +16,8 @@ afterEach(() => vi.useRealTimers())
 function afficher() {
   const d = ferme()
   d.transactions!.push(tx({ id: 'ancien', date: '2025-03-10', client_id: 'c-ass', prix_unitaire: 900000 }))
+  d.transactions!.push(tx({ id: 'sal', date: '2026-10-28', type: 'depense', client_id: null, produit_id: 'p-sal', prix_unitaire: 40000, montant_paye: 40000 }))
+  d.paiements = [paiement({ id: 'pf', client_id: 'c-ass', sens: 'fournisseur', montant: 15000, date: '2026-10-29' })]
   render(<DonneesFixes donnees={d}><Rapports /></DonneesFixes>)
   return userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
 }
@@ -44,6 +46,10 @@ describe('Rapports', () => {
     expect(esp(zone.textContent)).toContain('750 œufs')
     expect(esp(zone.textContent)).toContain('25 plateaux')
     expect(esp(zone.textContent)).toContain('2 400 F')
+  })
+  it('montre l’argent réellement sorti (paiements à leur date)', () => {
+    afficher()
+    expect(esp(screen.getByRole('region', { name: 'Trésorerie' }).textContent)).toContain('Argent réellement sorti55 000 F')
   })
   it('détaille les dépenses par poste', () => {
     afficher()

@@ -2,12 +2,12 @@ import { IconCash, IconEgg, IconReceipt } from '@tabler/icons-react'
 import { Link } from 'react-router-dom'
 import { useDonnees } from '../../data/useDonnees'
 import { calculerAlertes } from '../../lib/calculs/alertes'
-import { ageSemaines, bandesEnProduction, effectifPresent } from '../../lib/calculs/bandes'
+import { bandesEnProduction } from '../../lib/calculs/bandes'
+import { couleurTendance, oeufsFerme, tendanceOeufs } from '../../lib/calculs/suiviOeufs'
 import { bilanMensuel } from '../../lib/calculs/bilans'
-import { couleurTaux } from '../../lib/calculs/couleur'
 import { soldesClients } from '../../lib/calculs/credits'
+import { dettesFournisseurs } from '../../lib/calculs/dettes'
 import { OEUFS_PAR_PLATEAU, decomposer, stockOeufs } from '../../lib/calculs/oeufs'
-import { tauxAttendu, tauxPonte } from '../../lib/calculs/ponte'
 import { ajouterJours, aujourdhui, formatFCFA } from '../../lib/format'
 import { Compteur } from '../composants/animations'
 import { Alerte, CarteMetrique } from '../composants/communs'
@@ -35,7 +35,6 @@ export function Accueil() {
   const ref = aujourdhui()
   const hier = ajouterJours(ref, -1)
   const r = reglages[0]
-  const courbe = r?.courbe_attendue ?? undefined
 
   const mois = ref.slice(0, 7)
   const nomMois = NOMS_MOIS[Number(mois.slice(5)) - 1]
@@ -43,6 +42,7 @@ export function Accueil() {
   const ce = bilan.find((l) => l.periode === mois) ?? { ventes: 0, depenses: 0, resultat: 0 }
   const avant = bilan.find((l) => l.periode === moisPrecedent(mois))
   const credits = soldesClients(clients, transactions, paiements).filter((s) => s.solde > 0).reduce((t, s) => t + s.solde, 0)
+  const dettes = dettesFournisseurs(clients, transactions, paiements, ref)
   // Écart en francs : un pourcentage n'a pas de sens quand le résultat est négatif.
   const ecartResultat = avant ? ce.resultat - avant.resultat : null
   const nomMoisPrecedent = NOMS_MOIS[Number(moisPrecedent(mois).slice(5)) - 1]
@@ -50,13 +50,16 @@ export function Accueil() {
   const enProd = bandesEnProduction(bandes, ponte, ref)
   const ponteHier = enProd.map((b) => {
     const p = ponte.find((x) => x.bande_id === b.id && x.date === hier && !x.supprime_le)
-    const taux = p ? tauxPonte(p.oeufs_collectes, effectifPresent(b, ponte, hier)) : null
-    return { b, p, taux, attendu: tauxAttendu(ageSemaines(b, hier), courbe) }
+    return { b, p, tendance: p ? tendanceOeufs(b.id, ponte, hier) : null }
   })
-  const totalHier = decomposer(ponteHier.reduce((s, x) => s + (x.p?.oeufs_collectes ?? 0), 0), OEUFS_PAR_PLATEAU)
+  const oeufsHier = oeufsFerme(ponte, hier)
+  const totalHier = decomposer(oeufsHier, OEUFS_PAR_PLATEAU)
+  const joursAvant = Array.from({ length: 7 }, (_, i) => oeufsFerme(ponte, ajouterJours(hier, -1 - i))).filter((n) => n > 0)
+  const moyenneFerme = joursAvant.length ? joursAvant.reduce((s, n) => s + n, 0) / joursAvant.length : null
+  const evolutionFerme = moyenneFerme && oeufsHier ? (oeufsHier - moyenneFerme) / moyenneFerme : null
   const stock = r?.stock_depart ? decomposer(Math.max(0, stockOeufs({ pontes: ponte, transactions, produits, depart: r.stock_depart })), OEUFS_PAR_PLATEAU) : null
 
-  const alertes = calculerAlertes({ ref, heure: new Date().getHours(), bandes, pontes: ponte, derniereSauvegarde: r?.derniere_sauvegarde ?? null, seuils: r?.seuils })
+  const alertes = calculerAlertes({ ref, heure: new Date().getHours(), bandes, pontes: ponte, derniereSauvegarde: r?.derniere_sauvegarde ?? null, seuils: r?.seuils, dettes: dettes.lignes })
 
   return (
     <main>
@@ -93,6 +96,9 @@ export function Accueil() {
         <Link to="/clients" style={{ color: 'inherit', textDecoration: 'none' }}>
           <CarteMetrique libelle="Crédits dus" valeur={formatFCFA(credits)} />
         </Link>
+        <Link to="/fournisseurs" style={{ color: 'inherit', textDecoration: 'none' }}>
+          <CarteMetrique libelle="À payer" valeur={formatFCFA(dettes.total)} />
+        </Link>
         {stock ? (
           <CarteMetrique libelle="Stock d’œufs" valeur={`${stock.lots} plateaux${stock.restants ? ` + ${stock.restants}` : ''}`} />
         ) : (
@@ -104,21 +110,30 @@ export function Accueil() {
 
       <section aria-label="Ponte d’hier" className="carte">
         <h2 style={{ marginTop: 0 }}>Ponte d’hier</h2>
-        {ponteHier.map(({ b, taux, attendu }) => {
-          const classe = taux == null ? '' : couleurTaux(taux, attendu)
+        {ponteHier.map(({ b, p, tendance }) => {
+          const classe = tendance ? couleurTendance(tendance.ecart, r?.seuils?.baisse_pct) : ''
           return (
-            <div key={b.id} style={{ padding: '6px 0' }}>
-              <div className="ligne" style={{ padding: '0 0 4px' }}>
-                <span>{b.nom} <span className="discret">box {b.box}</span></span>
-                {taux == null ? <span className="discret">non saisie</span> : <strong className={classe}>{Math.round(taux * 100)} %</strong>}
-              </div>
-              <div className={`jauge ${classe === 'ok' ? '' : classe}`}><span style={{ width: `${taux == null ? 0 : Math.min(100, Math.round(taux * 100))}%` }} /></div>
+            <div key={b.id} className="ligne">
+              <span>{b.nom} <span className="discret">box {b.box}</span></span>
+              {p == null ? <span className="discret">non saisie</span> : (
+                <span style={{ textAlign: 'right' }}>
+                  <strong>{p.oeufs_collectes} œufs</strong>
+                  {tendance && <span className={classe} style={{ display: 'block', fontSize: 12, fontWeight: 700 }}>{tendance.ecart >= 0 ? '▲' : '▼'} {Math.abs(Math.round(tendance.ecart * 100))} % vs 7 j</span>}
+                </span>
+              )}
             </div>
           )
         })}
         <div className="ligne" style={{ borderTop: '1px solid var(--bord)', marginTop: 6 }}>
           <span>Ferme</span>
-          <strong>{totalHier.lots} plateaux + {totalHier.restants}</strong>
+          <span style={{ textAlign: 'right' }}>
+            <strong>{oeufsHier} œufs · {totalHier.lots} plateaux + {totalHier.restants}</strong>
+            {evolutionFerme != null && (
+              <span data-testid="evolution-ferme" className={couleurTendance(evolutionFerme, r?.seuils?.baisse_pct)} style={{ display: 'block', fontSize: 12, fontWeight: 700 }}>
+                {evolutionFerme >= 0 ? '▲' : '▼'} {Math.abs(Math.round(evolutionFerme * 100))} % par rapport à la moyenne de 7 jours
+              </span>
+            )}
+          </span>
         </div>
       </section>
     </main>

@@ -5,7 +5,7 @@ import { Bandes } from '../../src/ui/pages/Bandes'
 import { BandeFiche } from '../../src/ui/pages/BandeFiche'
 import { DonneesFixes } from '../../src/data/useDonnees'
 import { BANDES, ponte } from '../fixtures/bandes'
-import type { Bande } from '../../src/lib/types'
+import type { Bande, Recensement } from '../../src/lib/types'
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
@@ -13,11 +13,11 @@ beforeEach(() => {
 })
 afterEach(() => vi.useRealTimers())
 
-function afficher(chemin: string, bandes: Bande[] = BANDES) {
+function afficher(chemin: string, bandes: Bande[] = BANDES, recensements: Recensement[] = []) {
   const enregistrer = vi.fn(async (_t: string, l: Record<string, unknown>) => (l.id as string) ?? 'x')
   const pontes = [ponte('b4', '2026-10-30', { oeufs_collectes: 520, mortalite: 3 }), ponte('b4', '2026-10-29', { oeufs_collectes: 500 })]
   render(
-    <DonneesFixes donnees={{ bandes, ponte: pontes }} actions={{ enregistrer }}>
+    <DonneesFixes donnees={{ bandes, ponte: pontes, recensements }} actions={{ enregistrer }}>
       <MemoryRouter initialEntries={[chemin]}>
         <Routes>
           <Route path="/bandes" element={<Bandes />} />
@@ -36,8 +36,8 @@ describe('Liste des bandes', () => {
     expect(ligne).toHaveTextContent('box 2')
     expect(ligne).toHaveTextContent('63 sem.')
     expect(ligne).toHaveTextContent('Ponte')
-    expect(ligne).toHaveTextContent('647 poules')
-    expect(ligne).toHaveTextContent('78 %') // (520/650 + 500/650) / 2 = 78,5 → 78
+    expect(ligne).toHaveTextContent('510 œufs/jour') // moyenne de 520 et 500 sur 7 jours
+    expect(ligne).toHaveTextContent('≈ 647 poules')
     expect(screen.getByRole('link', { name: /BANDE 3/ })).toHaveTextContent('Fin de cycle')
   })
   it('range les bandes réformées à part', () => {
@@ -87,5 +87,24 @@ describe('Modifier une bande', () => {
     await u.type(within(f).getByLabelText('Effectif initial'), '655')
     await u.click(within(f).getByRole('button', { name: 'Enregistrer' }))
     expect(enregistrer).toHaveBeenCalledWith('bandes', expect.objectContaining({ id: 'b2', date_reforme: '2026-04-10', effectif_initial: 655 }))
+  })
+})
+
+describe('Recompter la bande', () => {
+  it('enregistre l’effectif compté', async () => {
+    const { u, enregistrer } = afficher('/bandes/b4')
+    await u.click(screen.getByRole('button', { name: 'Recompter la bande' }))
+    const f = screen.getByRole('form', { name: 'Recompter la bande' })
+    await u.type(within(f).getByLabelText('Poules comptées'), '630')
+    await u.click(within(f).getByRole('button', { name: 'Enregistrer le comptage' }))
+    expect(enregistrer).toHaveBeenCalledWith('recensements', expect.objectContaining({ bande_id: 'b4', date: '2026-10-31', effectif: 630 }))
+  })
+  it('recale l’effectif et montre les poules manquantes constatées', () => {
+    afficher('/bandes/b4', BANDES, [{ id: 'r1', bande_id: 'b4', date: '2026-10-20', effectif: 620 }])
+    expect(screen.getByText('Effectif actuel').nextSibling).toHaveTextContent('617')
+    const zone = screen.getByRole('region', { name: 'Recomptages' })
+    expect(zone).toHaveTextContent('20/10/2026')
+    expect(zone).toHaveTextContent('620 poules')
+    expect(zone).toHaveTextContent('30 manquantes')
   })
 })

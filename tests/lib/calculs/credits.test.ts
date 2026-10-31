@@ -24,8 +24,8 @@ describe('validerTransaction', () => {
     expect(e.produit_id).toBe('Produit obligatoire')
     expect(e.client_id).toBe('Client obligatoire')
   })
-  it("n'exige pas de client pour une dépense", () => {
-    expect(validerTransaction({ ...ok, type: 'depense', client_id: null, montant_paye: 0 }, '2026-10-31')).toEqual({})
+  it("n'exige pas de fournisseur pour une dépense payée", () => {
+    expect(validerTransaction({ ...ok, type: 'depense', client_id: null, montant_paye: 52000 }, '2026-10-31')).toEqual({})
   })
 })
 

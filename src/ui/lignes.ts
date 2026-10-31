@@ -29,7 +29,7 @@ export function journal(d: Donnees): LigneJournal[] {
     })),
     ...d.paiements.map((p) => ({
       table: 'paiements' as const, id: p.id, date: p.date, genre: 'paiement' as const, client_id: p.client_id, produit_id: null,
-      titre: `Paiement · ${nom(d.clients, p.client_id)}`, detail: `${formatFCFA(p.montant)} (${MODES.find((m) => m[0] === p.mode)?.[1]})`,
+      titre: `${p.sens === 'fournisseur' ? 'Paiement fournisseur' : 'Paiement'} · ${nom(d.clients, p.client_id)}`, detail: `${formatFCFA(p.montant)} (${MODES.find((m) => m[0] === p.mode)?.[1]})`,
       auteur: auteur(p.cree_par), supprime_le: p.supprime_le,
     })),
     ...d.ponte.map((p) => ({

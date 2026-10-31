@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 
 const LIENS: [string, string, string][] = [
   ['/clients', 'Clients et crédits', 'Qui doit combien, paiements, rappels'],
+  ['/fournisseurs', 'Fournisseurs et dettes', 'Ce qu’il reste à payer, depuis quand'],
   ['/rapports', 'Rapports', 'Bilans, produits, clients, dépenses'],
   ['/historique', 'Historique', 'Toutes les saisies, modifier ou supprimer'],
   ['/corbeille', 'Corbeille', 'Restaurer une saisie supprimée'],
