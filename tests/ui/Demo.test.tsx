@@ -5,6 +5,6 @@ describe('mode démonstration', () => {
   it('affiche l’accueil avec des données d’exemple', () => {
     render(<Demo />)
     expect(screen.getByRole('heading', { name: /The Good Farm/ })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Ponte d’hier' })).toHaveTextContent('BANDE 6')
+    expect(screen.getByLabelText('Stock par calibre')).toHaveTextContent('Gros')
   })
 })

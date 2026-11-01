@@ -40,6 +40,8 @@ export interface Transaction extends Audit {
   montant_paye: number
   /** Ventes d'œufs : nombre d'œufs par unité vendue (30 = plateau). Absent = 30. */
   oeufs_par_unite?: number | null
+  /** Ventes d'œufs : calibre vendu (absent = non précisé). */
+  calibre?: Calibre | null
   observation?: string | null
 }
 
@@ -67,9 +69,13 @@ export interface Ouvrier extends Audit {
 export type Box = number
 
 /** Un box de la ferme et l'ouvrier qui s'en occupe (il reste quand les bandes changent). */
+export type Calibre = 'petit' | 'moyen' | 'gros'
+
 export interface BoxFerme {
   numero: Box
   ouvrier_id: string | null
+  /** Calibre des œufs du box, choisi à la main (toute la bande pond à peu près pareil). */
+  calibre?: Calibre | null
 }
 
 export interface Bande extends Audit {
@@ -103,6 +109,38 @@ export interface Mortalite extends Audit {
   observation?: string | null
 }
 
+export interface LigneRamassage {
+  /** 0 : chargement global au magasin (sinon numéro de box, anciens ramassages). */
+  numero: Box
+  /** Œufs attendus d'après la ponte saisie jusqu'à la veille. */
+  theorique: number
+  /** Œufs chargés en tout, y compris ceux ramassés le matin même. */
+  charge: number
+  /** Œufs de la collecte du matin du jour du passage : ils seront comptés le soir dans la ponte du jour. */
+  matin?: number | null
+  /** Calibre de ces œufs (une ligne par calibre) ; absent = non classé. */
+  calibre?: Calibre | null
+}
+
+/** Plateaux du chargement vendus à un client ; la vente correspondante est `transaction_id`. */
+export interface LigneRepartition {
+  client_id: string
+  calibre?: Calibre | null
+  plateaux: number
+  prix: number
+  transaction_id: string
+}
+
+export interface Ramassage extends Audit {
+  id: string
+  /** Jour du passage de la voiture ; il emporte les œufs pondus de `du` à la veille de `date`. */
+  date: DateISO
+  du: DateISO
+  lignes: LigneRamassage[]
+  repartition?: LigneRepartition[] | null
+  observation?: string | null
+}
+
 export interface Ponte extends Audit {
   id: string
   date: DateISO
@@ -117,6 +155,8 @@ export interface Ponte extends Audit {
 export interface Seuils {
   /** Baisse des œufs d'une bande (en %) par rapport à sa moyenne des 7 jours précédents. */
   baisse_pct: number
+  /** Alerte de mortalité facultative : le suivi se fait d'abord sur les œufs du jour. */
+  alerte_mortalite: boolean
   mortalite_pour_mille: number
   jours_sauvegarde: number
   jours_dette: number
@@ -131,6 +171,17 @@ export interface Conditionnement {
 export interface StockDepart {
   date: DateISO
   oeufs: number
+  /** Œufs comptés par calibre ; le reste de `oeufs` est « non classé ». */
+  par_calibre?: Partial<Record<Calibre, number>> | null
+}
+
+/** Suivi du stock d'aliment des pondeuses. */
+export interface ReglagesAliment {
+  produit_ids?: string[] | null
+  kg_par_sac?: number | null
+  /** Sacs comptés au magasin le jour `date`. */
+  stock?: { date: DateISO; sacs: number } | null
+  jours_alerte?: number | null
 }
 
 export interface Reglages {
@@ -140,4 +191,7 @@ export interface Reglages {
   conditionnements?: Conditionnement[] | null
   stock_depart?: StockDepart | null
   boxes?: BoxFerme[] | null
+  aliment?: ReglagesAliment | null
+  /** Produits de dépense exclus du prix de revient des œufs. */
+  couts_exclus?: string[] | null
 }

@@ -30,11 +30,14 @@ export function Recapitulatif({ titre, lignes, total, onModifier, onValider, enC
 
 /** Écran de réussite avec coche animée et message encourageant. */
 export function Reussite({ message, detail, action, onAction }: { message: string; detail?: string; action: string; onAction: () => void }) {
+  // Sans réseau, la saisie est bien gardée, mais pas encore sur le serveur : on le dit pour ne pas surprendre l'autre téléphone.
+  const horsLigne = typeof navigator !== 'undefined' && !navigator.onLine
   return (
     <div className="carte" role="status" style={{ textAlign: 'center', padding: '24px 16px' }}>
       <CocheSucces />
       <p style={{ fontSize: 20, fontWeight: 800, margin: '10px 0 4px' }}>{message}</p>
       {detail && <p className="discret" style={{ marginTop: 0 }}>{detail}</p>}
+      {horsLigne && <p className="alerte attention" style={{ textAlign: 'left' }}>Pas de réseau : la saisie est gardée sur le téléphone et sera envoyée toute seule dès le retour du réseau.</p>}
       <button className="principal" onClick={onAction}>{action}</button>
     </div>
   )

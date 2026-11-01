@@ -5,8 +5,9 @@ import { dernierPrix, validerTransaction } from '../../lib/calculs/credits'
 import { estDoublonTransaction } from '../../lib/calculs/doublons'
 import { CONDITIONNEMENTS_DEFAUT, OEUFS_PAR_PLATEAU, estProduitOeufs } from '../../lib/calculs/oeufs'
 import { aujourdhui, formatDate, formatFCFA } from '../../lib/format'
-import type { Transaction, TypeTx, Unite } from '../../lib/types'
+import type { Calibre, Transaction, TypeTx, Unite } from '../../lib/types'
 import { vibrer } from '../composants/animations'
+import { CALIBRES, NOM_CALIBRE } from '../../lib/calculs/calibres'
 import { BoutonsProduits } from '../composants/BoutonsProduits'
 import { ChampClient } from '../composants/ChampClient'
 import { ChampMontant, Confirmation } from '../composants/communs'
@@ -26,6 +27,7 @@ type Formulaire = {
   quantite: number | null
   prix_unitaire: number | null
   oeufs_par_unite: number
+  calibre?: Calibre | null
   paye: Paye
   montant_paye: number | null
   observation: string
@@ -45,7 +47,7 @@ export function Saisir() {
   const { clients, produits, transactions, reglages, enregistrer } = useDonnees()
   const [params] = useSearchParams()
   const typeDemande: TypeTx = params.get('type') === 'depense' ? 'depense' : 'vente'
-  const [f, setF, effacer] = useBrouillon<Formulaire>('brouillon-saisie', () => vide(typeDemande), (b) => ({
+  const [f, setF] = useBrouillon<Formulaire>('brouillon-saisie', () => vide(typeDemande), (b) => ({
     ...b,
     id: b.id ?? crypto.randomUUID(),
     oeufs_par_unite: b.oeufs_par_unite ?? OEUFS_PAR_PLATEAU,
@@ -55,6 +57,7 @@ export function Saisir() {
   const [erreurs, setErreurs] = useState<Record<string, string>>({})
   const [doublon, setDoublon] = useState(false)
   const [etape, setEtape] = useState<'formulaire' | 'recap' | 'fait'>('formulaire')
+  const [bilan, setBilan] = useState({ message: '', detail: '' })
   const [enCours, setEnCours] = useState(false)
 
   const conditionnements = reglages[0]?.conditionnements?.length ? reglages[0].conditionnements : CONDITIONNEMENTS_DEFAUT
@@ -99,7 +102,7 @@ export function Saisir() {
     return {
       id: f.id, date: f.date, type: f.type, client_id: f.client_id, produit_id: f.produit_id ?? '',
       prix_unitaire: f.prix_unitaire ?? 0, quantite: f.quantite ?? 0, montant, montant_paye: montantPaye,
-      oeufs_par_unite: oeufs ? f.oeufs_par_unite : null, observation: f.observation.trim() || null,
+      oeufs_par_unite: oeufs ? f.oeufs_par_unite : null, calibre: oeufs ? f.calibre ?? null : null, observation: f.observation.trim() || null,
     }
   }
 
@@ -119,6 +122,12 @@ export function Saisir() {
     try {
       await enregistrer('transactions', { ...construire() })
       vibrer()
+      setBilan({
+        message: f.type === 'vente' ? 'Vente enregistrée' : 'Dépense enregistrée',
+        detail: `${formatFCFA(montant)}${reste > 0 ? ` · reste ${formatFCFA(reste)} à ${f.type === 'vente' ? 'encaisser' : 'payer'}` : ''}`,
+      })
+      // Le brouillon est vidé tout de suite (nouvel id) : revenir sur l'écran ne doit jamais réenregistrer, donc écraser, cette saisie.
+      setF(vide(f.type))
       setEtape('fait')
     } finally {
       setEnCours(false)
@@ -129,10 +138,10 @@ export function Saisir() {
     return (
       <main>
         <Reussite
-          message={f.type === 'vente' ? 'Vente enregistrée' : 'Dépense enregistrée'}
-          detail={`${formatFCFA(montant)}${reste > 0 ? ` · reste ${formatFCFA(reste)} à ${f.type === 'vente' ? 'encaisser' : 'payer'}` : ''}`}
+          message={bilan.message}
+          detail={bilan.detail}
           action="Nouvelle saisie"
-          onAction={() => { effacer(); setEtape('formulaire'); setErreurs({}) }}
+          onAction={() => { setEtape('formulaire'); setErreurs({}) }}
         />
       </main>
     )
@@ -148,6 +157,7 @@ export function Saisir() {
             ...(nomClient ? [[f.type === 'vente' ? 'Client' : 'Fournisseur', nomClient] as [string, string]] : []),
             ['Produit', produit?.nom ?? ''],
             ['Quantité', oeufs ? `${f.quantite} × ${cond.nom}` : `${f.quantite} × ${formatFCFA(f.prix_unitaire ?? 0)}`],
+            ...(oeufs && f.calibre ? [['Calibre', NOM_CALIBRE[f.calibre]] as [string, string]] : []),
             ...(oeufs ? [['Œufs', `${(f.quantite ?? 0) * cond.oeufs} œufs`] as [string, string], ['Prix', `${formatFCFA(f.prix_unitaire ?? 0)} / ${cond.nom.toLowerCase()}`] as [string, string]] : []),
             ['Paiement', f.paye === 'tout' ? 'Payé' : f.paye === 'rien' ? (f.type === 'vente' ? 'À crédit' : 'À payer plus tard') : `${formatFCFA(montantPaye)} payés`],
             ...(reste > 0 ? [['Reste à payer', formatFCFA(reste)] as [string, string]] : []),
@@ -196,6 +206,17 @@ export function Saisir() {
           <div className="puces" style={{ marginTop: 5 }}>
             {conditionnements.map((c) => (
               <button key={c.oeufs} type="button" className={c.oeufs === f.oeufs_par_unite ? 'choisi' : ''} onClick={() => choisirConditionnement(c.oeufs)}>{c.nom}</button>
+            ))}
+          </div>
+        </div>
+      )}
+      {oeufs && (
+        <div role="group" aria-label="Calibre" style={{ marginBottom: 10 }}>
+          <span className="discret">Calibre (facultatif)</span>
+          <div className="choix-calibre" style={{ marginTop: 5 }}>
+            {CALIBRES.map((c) => (
+              <button key={c} type="button" className={f.calibre === c ? 'choisi' : ''} aria-pressed={f.calibre === c}
+                onClick={() => maj({ calibre: f.calibre === c ? null : c })}>{NOM_CALIBRE[c]}</button>
             ))}
           </div>
         </div>

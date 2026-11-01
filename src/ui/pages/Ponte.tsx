@@ -3,11 +3,13 @@ import { useDonnees } from '../../data/useDonnees'
 import { ageSemaines, bandesEnProduction, effectifPresent, estVerifiee } from '../../lib/calculs/bandes'
 import { boxesFerme, ouvrierDuBox } from '../../lib/calculs/boxes'
 import { fiabiliteEffectif } from '../../lib/calculs/effectifs'
+import { KG_PAR_SAC } from '../../lib/calculs/aliment'
 import { CONDITIONNEMENTS_DEFAUT, OEUFS_PAR_PLATEAU, decomposer, enOeufs } from '../../lib/calculs/oeufs'
 import { tauxPonte } from '../../lib/calculs/ponte'
 import { couleurTendance, moyenneOeufs7 } from '../../lib/calculs/suiviOeufs'
 import { ajouterJours, aujourdhui, formatDate } from '../../lib/format'
 import type { Bande, Conditionnement, Ponte as TPonte } from '../../lib/types'
+import { useBrouillon } from '../useBrouillon'
 import { vibrer } from '../composants/animations'
 import { ChampMontant, Confirmation } from '../composants/communs'
 import { Recapitulatif, Reussite } from '../composants/Recapitulatif'
@@ -16,9 +18,26 @@ import { EtatVide, IconeBouton, Titre } from '../composants/Pastille'
 import { teinteBande } from '../bandes'
 
 /** Saisie d'une carte : nombre d'œufs gardé tel quel, affiché en lots du conditionnement choisi. */
-type Saisie = { id?: string; oeufs: number | null; perdus: number | null; morts: number | null; aliment: number | null; observation: string }
+type Saisie = {
+  id?: string; oeufs: number | null; perdus: number | null; morts: number | null; aliment: number | null; observation: string
+  /** Date de la saisie d'où vient l'aliment proposé, tant que l'utilisateur ne l'a pas changé. */
+  alimentRepris?: string | null
+}
 
-const estVide = (s: Saisie) => [s.oeufs, s.perdus, s.morts, s.aliment].every((v) => v == null) && !s.observation.trim()
+// L'aliment simplement repris de la veille ne suffit pas à « commencer » une carte : rien n'est enregistré sans ponte.
+const estVide = (s: Saisie) => [s.oeufs, s.perdus, s.morts, s.alimentRepris ? null : s.aliment].every((v) => v == null) && !s.observation.trim()
+
+/**
+ * Dernière quantité d'aliment notée pour la bande avant `date` ; à défaut, celle du même box
+ * (une nouvelle bande reprend ce que mangeait la précédente).
+ */
+export function dernierAliment(b: Bande, bandes: Bande[], pontes: TPonte[], date: string): { kg: number; date: string } | null {
+  const avant = (ids: string[]) => pontes
+    .filter((p) => ids.includes(p.bande_id) && !p.supprime_le && p.aliment_kg != null && p.date < date)
+    .sort((x, y) => y.date.localeCompare(x.date))[0]
+  const p = avant([b.id]) ?? avant(bandes.filter((x) => x.box === b.box && x.id !== b.id).map((x) => x.id))
+  return p ? { kg: p.aliment_kg!, date: p.date } : null
+}
 
 const PLURIELS: Record<string, string> = { Plateau: 'Plateaux', Carton: 'Cartons', Boîte: 'Boîtes' }
 export function pluriel(nom: string): string {
@@ -31,9 +50,25 @@ function depuisPonte(p?: TPonte): Saisie {
   return { id: p.id, oeufs: p.oeufs_collectes, perdus: p.oeufs_perdus, morts: p.mortalite, aliment: p.aliment_kg, observation: p.observation ?? '' }
 }
 
-function CartePonte({ bande, effectif, verifie, estime, ouvrier, moyenne, semaines, saisie, cond, seuilBaisse, onChange }: {
+/** « Hier : 54 plateaux · Aujourd'hui : 56 plateaux (+2) », coloré selon la variation. */
+function HierAujourdhui({ hier, aujourdhui: auj, seuilBaisse, testId }: { hier: number | null; aujourdhui: number; seuilBaisse?: number; testId?: string }) {
+  const p = (n: number) => decomposer(n, OEUFS_PAR_PLATEAU)
+  const texte = (n: number) => `${p(n).lots} plateau${p(n).lots > 1 ? 'x' : ''}${p(n).restants ? ` + ${p(n).restants}` : ''}`
+  const diff = hier != null ? p(auj).lots - p(hier).lots : null
+  const classe = hier ? couleurTendance((auj - hier) / hier, seuilBaisse) : ''
+  return (
+    <div data-testid={testId} className="hier-auj">
+      <span>Hier : <strong>{hier == null ? 'non saisi' : texte(hier)}</strong></span>
+      <span>Aujourd’hui : <strong>{texte(auj)}</strong>
+        {diff != null && <span className={classe}> ({diff > 0 ? '+' : ''}{diff})</span>}
+      </span>
+    </div>
+  )
+}
+
+function CartePonte({ bande, effectif, verifie, estime, ouvrier, moyenne, semaines, saisie, cond, seuilBaisse, kgSac, hier, onChange }: {
   bande: Bande; effectif: number; verifie: boolean; estime: number | null; ouvrier?: string; moyenne: number | null; semaines: number
-  saisie: Saisie; cond: Conditionnement; seuilBaisse?: number; onChange: (s: Saisie) => void
+  saisie: Saisie; cond: Conditionnement; seuilBaisse?: number; kgSac: number; hier: number | null; onChange: (s: Saisie) => void
 }) {
   const maj = (p: Partial<Saisie>) => onChange({ ...saisie, ...p })
   const n = saisie.oeufs ?? 0
@@ -57,6 +92,7 @@ function CartePonte({ bande, effectif, verifie, estime, ouvrier, moyenne, semain
         {semaines} sem.{moyenne != null && ` · moyenne 7 j : ${Math.round(moyenne)} œufs`}
         {!vide && ` · ${plateaux.lots} plateaux${plateaux.restants ? ` + ${plateaux.restants}` : ''}`}
       </div>
+      {!vide && <HierAujourdhui hier={hier} aujourdhui={n} seuilBaisse={seuilBaisse} testId="hier-auj" />}
       {!vide && ecart != null && (
         <div data-testid="tendance" className={classe} style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
           {ecart >= 0 ? '▲' : '▼'} {Math.abs(Math.round(ecart * 100))} % par rapport à sa moyenne de 7 jours ({Math.round(moyenne!)})
@@ -69,11 +105,23 @@ function CartePonte({ bande, effectif, verifie, estime, ouvrier, moyenne, semain
         <ChampMontant libelle={cond.oeufs > 1 ? pluriel(cond.nom) : 'Œufs'} valeur={vide ? null : lots} onChange={changerLots} />
         {cond.oeufs > 1 && <ChampMontant libelle="+ œufs" valeur={vide ? null : restants} onChange={changerRestants} />}
       </div>
-      <div className="grille3">
+      <div className="grille2">
         <ChampMontant libelle="Perdus" valeur={saisie.perdus} onChange={(v) => maj({ perdus: v })} />
         <ChampMontant libelle="Morts (facultatif)" valeur={saisie.morts} onChange={(v) => maj({ morts: v })} />
-        <ChampMontant libelle="Aliment (kg)" valeur={saisie.aliment} onChange={(v) => maj({ aliment: v })} />
       </div>
+      <div className="champ-aliment">
+        <button type="button" aria-label={`${bande.nom} : 1 sac de moins`} disabled={(saisie.aliment ?? 0) < kgSac}
+          onClick={() => maj({ aliment: Math.max(0, (saisie.aliment ?? 0) - kgSac), alimentRepris: null })}>− 1 sac</button>
+        <ChampMontant libelle="Aliment (kg)" valeur={saisie.aliment} onChange={(v) => maj({ aliment: v, alimentRepris: null })} />
+        <button type="button" aria-label={`${bande.nom} : 1 sac de plus`}
+          onClick={() => maj({ aliment: (saisie.aliment ?? 0) + kgSac, alimentRepris: null })}>+ 1 sac</button>
+      </div>
+      {saisie.aliment != null && (
+        <div className="discret" style={{ marginTop: -6, marginBottom: 6 }}>
+          = {(saisie.aliment / kgSac).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} sac{saisie.aliment / kgSac > 1 ? 's' : ''} de {kgSac} kg
+          {saisie.alimentRepris && <span className="repris"> · comme le {formatDate(saisie.alimentRepris).slice(0, 5)}</span>}
+        </div>
+      )}
       {n > 0 && <div className="discret">Total : {n} œufs</div>}
     </div>
   )
@@ -84,16 +132,27 @@ function SaisieDuJour({ date, cond }: { date: string; cond: Conditionnement }) {
   const boxes = boxesFerme(reglages[0], bandes)
   const enProd = bandesEnProduction(bandes, ponte, date)
   // Seules les cartes modifiées ici sont gardées en état ; les autres suivent les données (y compris celles qui arrivent après l'ouverture).
-  const [modifiees, setModifiees] = useState<Record<string, Saisie>>({})
+  // Brouillon par jour : changer d'onglet, de date ou recevoir un appel ne fait pas perdre ce qui a été tapé.
+  const [modifiees, setModifiees, oublierBrouillon] = useBrouillon<Record<string, Saisie>>(`brouillon-ponte-${date}`, () => ({}))
   const [aConfirmer, setAConfirmer] = useState<string[] | null>(null)
   const [etape, setEtape] = useState<'cartes' | 'recap' | 'fait'>('cartes')
   const [record, setRecord] = useState(false)
+  const [bilan, setBilan] = useState(0)
   const [enCours, setEnCours] = useState(false)
 
   const existante = (bandeId: string) => ponte.find((p) => p.bande_id === bandeId && p.date === date && !p.supprime_le)
-  const saisieDe = (bandeId: string) => modifiees[bandeId] ?? depuisPonte(existante(bandeId))
+  const kgSac = reglages[0]?.aliment?.kg_par_sac || KG_PAR_SAC
+  /** Jour pas encore saisi : l'aliment reprend la dernière quantité notée, sauf modification. */
+  function saisieDe(b: Bande): Saisie {
+    if (modifiees[b.id]) return modifiees[b.id]
+    const p = existante(b.id)
+    if (p) return depuisPonte(p)
+    const dernier = dernierAliment(b, bandes, ponte, date)
+    return { ...depuisPonte(), aliment: dernier?.kg ?? null, alimentRepris: dernier?.date ?? null }
+  }
   const aEnregistrer = enProd.filter((b) => modifiees[b.id] && !estVide(modifiees[b.id]))
-  const totalJour = enProd.reduce((s, b) => s + (saisieDe(b.id).oeufs ?? 0), 0)
+  const totalJour = enProd.reduce((s, b) => s + (saisieDe(b).oeufs ?? 0), 0)
+  const totalHier = ponte.filter((p) => p.date === ajouterJours(date, -1) && !p.supprime_le).reduce((s, p) => s + p.oeufs_collectes, 0)
 
   function continuer(forcer = false) {
     // Seulement pour les bandes comptées : ailleurs, c'est l'effectif noté qui est douteux, pas la saisie.
@@ -128,6 +187,8 @@ function SaisieDuJour({ date, cond }: { date: string; cond: Conditionnement }) {
         setModifiees((x) => ({ ...x, [b.id]: { ...x[b.id], id } }))
       }
       setRecord(estRecord())
+      setBilan(totalJour)
+      oublierBrouillon()
       vibrer()
       setEtape('fait')
     } finally {
@@ -138,11 +199,11 @@ function SaisieDuJour({ date, cond }: { date: string; cond: Conditionnement }) {
   if (enProd.length === 0) return <EtatVide genre="bande" message="Aucune bande en production à cette date." />
 
   if (etape === 'fait') {
-    const { lots, restants } = decomposer(totalJour, OEUFS_PAR_PLATEAU)
+    const { lots, restants } = decomposer(bilan, OEUFS_PAR_PLATEAU)
     return (
       <Reussite
         message="Ponte enregistrée"
-        detail={`${record ? 'Record de la semaine ! ' : ''}${totalJour} œufs, soit ${lots} plateaux${restants ? ` et ${restants} œufs` : ''}.`}
+        detail={`${record ? 'Record de la semaine ! ' : ''}${bilan} œufs, soit ${lots} plateaux${restants ? ` et ${restants} œufs` : ''}.`}
         action="Retour à l’accueil"
         onAction={() => { window.location.hash = '#/' }}
       />
@@ -182,12 +243,20 @@ function SaisieDuJour({ date, cond }: { date: string; cond: Conditionnement }) {
           semaines={ageSemaines(b, date)}
           moyenne={moyenneOeufs7(b.id, ponte, date)}
           seuilBaisse={reglages[0]?.seuils?.baisse_pct}
-          saisie={saisieDe(b.id)}
+          saisie={saisieDe(b)}
+          kgSac={kgSac}
+          hier={ponte.find((p) => p.bande_id === b.id && p.date === ajouterJours(date, -1) && !p.supprime_le)?.oeufs_collectes ?? null}
           onChange={(s) => setModifiees((x) => ({ ...x, [b.id]: s }))}
         />
       ))}
-      {totalJour > 0 && <p className="discret">Ferme : {decomposer(totalJour, OEUFS_PAR_PLATEAU).lots} plateaux et {decomposer(totalJour, OEUFS_PAR_PLATEAU).restants} œufs</p>}
-      <button className="principal" onClick={() => continuer()}>Continuer<IconeBouton Icone={IconArrowRight} /></button>
+      {totalJour > 0 && (
+        <div className="carte" aria-label="Ferme">
+          <strong>Ferme</strong>
+          <HierAujourdhui hier={totalHier || null} aujourdhui={totalJour} seuilBaisse={reglages[0]?.seuils?.baisse_pct} testId="hier-auj-ferme" />
+        </div>
+      )}
+      <button className="principal" disabled={aEnregistrer.length === 0} onClick={() => continuer()}>Continuer<IconeBouton Icone={IconArrowRight} /></button>
+      {aEnregistrer.length === 0 && <p className="discret" style={{ textAlign: 'center' }}>Saisissez les œufs d’au moins une bande pour continuer.</p>}
       {aConfirmer && (
         <Confirmation
           message={`Plus d’œufs que de poules pour ${aConfirmer.join(', ')}. Vérifiez les chiffres.`}
@@ -203,7 +272,11 @@ function SaisieDuJour({ date, cond }: { date: string; cond: Conditionnement }) {
 export function Ponte() {
   const { reglages } = useDonnees()
   const conditionnements = reglages[0]?.conditionnements?.length ? reglages[0].conditionnements : CONDITIONNEMENTS_DEFAUT
-  const [date, setDate] = useState(aujourdhui())
+  // « Corriger » une ponte refusée ouvre ce jour-là (#/ponte?date=AAAA-MM-JJ).
+  const [date, setDate] = useState(() => {
+    const d = new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('date')
+    return d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d <= aujourdhui() ? d : aujourdhui()
+  })
   const [taille, setTaille] = useState(OEUFS_PAR_PLATEAU)
   const cond = conditionnements.find((c) => c.oeufs === taille) ?? conditionnements[0]
   return (

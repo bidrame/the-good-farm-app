@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Ponte } from '../../src/ui/pages/Ponte'
 import { DonneesFixes, type Actions } from '../../src/data/useDonnees'
@@ -23,6 +23,8 @@ type U = ReturnType<typeof userEvent.setup>
 const carte = (nom: string) => screen.getByRole('group', { name: nom })
 const continuer = (u: U) => u.click(screen.getByRole('button', { name: 'Continuer' }))
 const valider = (u: U) => u.click(within(screen.getByRole('region', { name: 'Récapitulatif' })).getByRole('button', { name: /Valider|Enregistrement/ }))
+
+beforeEach(() => sessionStorage.clear())
 
 describe('Ponte du jour', () => {
   it('affiche une carte par box en production', () => {
@@ -182,5 +184,92 @@ describe('Ponte : robustesse', () => {
     await act(async () => {})
     await valider(u)
     expect(enregistrer).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Aliment repris de la veille', () => {
+  const hier = [ponte('b4', '2026-10-30', { oeufs_collectes: 500, aliment_kg: 50 }), ponte('b5', '2026-10-29', { oeufs_collectes: 400, aliment_kg: 75 })]
+
+  it('propose la dernière quantité notée pour chaque bande', () => {
+    afficher(hier)
+    expect(within(carte('BANDE 4')).getByLabelText('Aliment (kg)')).toHaveValue('50')
+    expect(carte('BANDE 4')).toHaveTextContent('= 1 sac de 50 kg · comme le 30/10')
+    expect(within(carte('BANDE 5')).getByLabelText('Aliment (kg)')).toHaveValue('75')
+    expect(within(carte('BANDE 3')).getByLabelText('Aliment (kg)')).toHaveValue('')
+  })
+
+  it('enregistre l’aliment repris avec la ponte, mais rien pour une bande sans ponte saisie', async () => {
+    const { u, enregistrer } = afficher(hier)
+    await u.type(within(carte('BANDE 4')).getByLabelText('Plateaux de 30'), '17')
+    await continuer(u)
+    await valider(u)
+    expect(enregistrer).toHaveBeenCalledWith('ponte', expect.objectContaining({ bande_id: 'b4', oeufs_collectes: 510, aliment_kg: 50 }))
+    expect(enregistrer).toHaveBeenCalledTimes(1) // la BANDE 5 garde ses 75 kg proposés, mais sans ponte rien ne part
+  })
+
+  it('± 1 sac ajuste la quantité, qui n’est plus marquée « comme hier »', async () => {
+    const { u, enregistrer } = afficher(hier)
+    await u.click(screen.getByRole('button', { name: 'BANDE 4 : 1 sac de plus' }))
+    expect(within(carte('BANDE 4')).getByLabelText('Aliment (kg)')).toHaveValue('100')
+    expect(carte('BANDE 4')).toHaveTextContent('= 2 sacs de 50 kg')
+    expect(carte('BANDE 4')).not.toHaveTextContent('comme le')
+    await u.type(within(carte('BANDE 4')).getByLabelText('Plateaux de 30'), '17')
+    await continuer(u)
+    await valider(u)
+    expect(enregistrer).toHaveBeenCalledWith('ponte', expect.objectContaining({ bande_id: 'b4', aliment_kg: 100 }))
+  })
+
+  it('une nouvelle bande reprend ce que mangeait la précédente dans le même box', async () => {
+    const { dernierAliment } = await import('../../src/ui/pages/Ponte')
+    const nouvelle = { ...bandes.find((b) => b.id === 'b6')!, id: 'b7', box: 4 }
+    expect(dernierAliment(nouvelle, [...bandes, nouvelle], [ponte('b6', '2026-10-30', { aliment_kg: 300 })], '2026-10-31')).toEqual({ kg: 300, date: '2026-10-30' })
+  })
+})
+
+describe('Bouton Continuer et comparaison avec hier', () => {
+  it('reste inactif tant qu’aucune ponte n’est saisie, même avec l’aliment repris', async () => {
+    const { u } = afficher([ponte('b4', '2026-10-30', { oeufs_collectes: 500, aliment_kg: 50 })])
+    expect(screen.getByRole('button', { name: 'Continuer' })).toBeDisabled()
+    expect(screen.getByText('Saisissez les œufs d’au moins une bande pour continuer.')).toBeInTheDocument()
+    await u.type(within(carte('BANDE 4')).getByLabelText('Plateaux de 30'), '17')
+    expect(screen.getByRole('button', { name: 'Continuer' })).toBeEnabled()
+  })
+
+  it('montre hier et aujourd’hui côte à côte, pour la bande et pour la ferme', async () => {
+    const { u } = afficher([ponte('b4', '2026-10-30', { oeufs_collectes: 510 })])
+    await u.type(within(carte('BANDE 4')).getByLabelText('Plateaux de 30'), '19')
+    expect(within(carte('BANDE 4')).getByTestId('hier-auj')).toHaveTextContent('Hier : 17 plateauxAujourd’hui : 19 plateaux (+2)')
+    expect(screen.getByTestId('hier-auj-ferme')).toHaveTextContent('Hier : 17 plateauxAujourd’hui : 19 plateaux (+2)')
+    await u.type(within(carte('BANDE 5')).getByLabelText('Plateaux de 30'), '10')
+    expect(within(carte('BANDE 5')).getByTestId('hier-auj')).toHaveTextContent('Hier : non saisi')
+  })
+})
+
+describe('Brouillon de la ponte', () => {
+  it('garde les chiffres tapés si on quitte l’écran puis qu’on revient', async () => {
+    const { u } = afficher()
+    await u.type(within(carte('BANDE 4')).getByLabelText('Plateaux de 30'), '16')
+    cleanup()
+    afficher()
+    expect(within(carte('BANDE 4')).getByLabelText('Plateaux de 30')).toHaveValue('16')
+  })
+
+  it('garde un brouillon par jour quand on change de date', async () => {
+    const { u } = afficher()
+    await u.type(within(carte('BANDE 4')).getByLabelText('Plateaux de 30'), '16')
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-10-30' } })
+    expect(within(carte('BANDE 4')).getByLabelText('Plateaux de 30')).toHaveValue('')
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-10-31' } })
+    expect(within(carte('BANDE 4')).getByLabelText('Plateaux de 30')).toHaveValue('16')
+  })
+
+  it('oublie le brouillon une fois la ponte validée', async () => {
+    const { u } = afficher()
+    await u.type(within(carte('BANDE 4')).getByLabelText('Plateaux de 30'), '16')
+    await continuer(u)
+    await valider(u)
+    expect(screen.getByText('Ponte enregistrée')).toBeInTheDocument()
+    const brouillons = Object.keys(sessionStorage).filter((k) => k.startsWith('brouillon-ponte')).map((k) => sessionStorage.getItem(k))
+    expect(brouillons.every((b) => b === '{}')).toBe(true)
   })
 })

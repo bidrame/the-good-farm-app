@@ -6,6 +6,7 @@ import { Corbeille } from '../../src/ui/pages/Corbeille'
 import { Reglages } from '../../src/ui/pages/Reglages'
 import { DonneesFixes, type Donnees } from '../../src/data/useDonnees'
 import { ferme } from '../fixtures/ferme'
+import { ponte } from '../fixtures/bandes'
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
@@ -52,9 +53,37 @@ describe('Historique', () => {
     await u.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Supprimer' }))
     expect(supprimer).toHaveBeenCalledWith('transactions', 't7')
   })
-  it('ne propose plus de modifier : on supprime puis on ressaisit', () => {
-    afficher(<Historique />)
-    expect(screen.queryByRole('button', { name: 'Modifier' })).not.toBeInTheDocument()
+  it('modifie une vente (quantité, montant payé)', async () => {
+    const { u, enregistrer } = afficher(<Historique />)
+    const dame = lignes().find((l) => l.textContent?.includes('Œufs · Dame'))!
+    await u.click(within(dame).getByRole('button', { name: 'Modifier' }))
+    const f = screen.getByRole('form', { name: 'Modifier la saisie' })
+    await u.clear(within(f).getByLabelText('Quantité'))
+    await u.type(within(f).getByLabelText('Quantité'), '6')
+    await u.clear(within(f).getByLabelText('Montant payé'))
+    await u.type(within(f).getByLabelText('Montant payé'), '13200')
+    await u.click(within(f).getByRole('button', { name: 'Enregistrer' }))
+    expect(enregistrer).toHaveBeenCalledWith('transactions', expect.objectContaining({ id: 't3', quantite: 6, montant: 13200, montant_paye: 13200 }))
+  })
+  it('modifie une dépense payée : elle reste payée en entier', async () => {
+    const { u, enregistrer } = afficher(<Historique />, (d) => { d.transactions![6].montant_paye = 60000 })
+    await u.click(within(lignes()[0]).getByRole('button', { name: 'Modifier' }))
+    const f = screen.getByRole('form', { name: 'Modifier la saisie' })
+    await u.clear(within(f).getByLabelText('Quantité'))
+    await u.type(within(f).getByLabelText('Quantité'), '5')
+    await u.click(within(f).getByRole('button', { name: 'Enregistrer' }))
+    expect(enregistrer).toHaveBeenCalledWith('transactions', expect.objectContaining({ id: 't7', type: 'depense', quantite: 5, montant: 75000, montant_paye: 75000 }))
+  })
+  it('refuse une modification invalide', async () => {
+    const { u, enregistrer } = afficher(<Historique />)
+    const dame = lignes().find((l) => l.textContent?.includes('Œufs · Dame'))!
+    await u.click(within(dame).getByRole('button', { name: 'Modifier' }))
+    const f = screen.getByRole('form', { name: 'Modifier la saisie' })
+    await u.clear(within(f).getByLabelText('Montant payé'))
+    await u.type(within(f).getByLabelText('Montant payé'), '99999')
+    await u.click(within(f).getByRole('button', { name: 'Enregistrer' }))
+    expect(within(f).getByText(/ne peut pas dépasser/)).toBeInTheDocument()
+    expect(enregistrer).not.toHaveBeenCalled()
   })
   it('distingue les paiements aux fournisseurs', () => {
     afficher(<Historique />, (d) => { d.paiements = [{ id: 'pf', client_id: 'c-ass', sens: 'fournisseur', date: '2026-10-30', montant: 5000, mode: 'wave' }] })
@@ -111,23 +140,42 @@ describe('Réglages : unités et seuils', () => {
     await u.selectOptions(screen.getByLabelText('Unité de Poulets frais'), 'kg')
     expect(enregistrer).toHaveBeenCalledWith('produits', expect.objectContaining({ id: 'p-pf', unite: 'kg' }))
   })
-  it('règle le seuil d’alerte des dettes fournisseurs', async () => {
+  it('règle le seuil d’alerte des dettes fournisseurs avec − et +', async () => {
     const { u, enregistrer } = afficher(<Reglages />)
-    const champ = screen.getByLabelText('Dette fournisseur signalée après (jours)')
+    const champ = screen.getByLabelText('Dette fournisseur (jours)')
     expect(champ).toHaveValue('30')
-    await u.clear(champ)
-    await u.type(champ, '45')
-    await u.click(screen.getByRole('button', { name: 'Enregistrer les seuils' }))
-    expect(enregistrer).toHaveBeenCalledWith('reglages', { id: 1, seuils: expect.objectContaining({ jours_dette: 45 }) })
+    await u.click(screen.getByRole('button', { name: 'Dette fournisseur (jours) : plus' }))
+    await u.click(screen.getByRole('button', { name: 'Dette fournisseur (jours) : plus' }))
+    expect(champ).toHaveValue('40')
+    await u.click(screen.getByRole('button', { name: 'Enregistrer les alertes' }))
+    expect(enregistrer).toHaveBeenCalledWith('reglages', { id: 1, seuils: expect.objectContaining({ jours_dette: 40 }) })
   })
-  it('modifie les seuils d’alerte', async () => {
-    const { u, enregistrer } = afficher(<Reglages />)
-    const champ = screen.getByLabelText('Baisse d’œufs signalée (%)')
-    expect(champ).toHaveValue('15')
+  it('formule les seuils en phrases, avec un exemple concret', async () => {
+    const { u, enregistrer } = afficher(<Reglages />, (d) => {
+      d.ponte = Array.from({ length: 7 }, (_, i) => ponte('b6', `2026-10-${24 + i}`, { oeufs_collectes: 2100 }))
+    })
+    const zone = screen.getByRole('region', { name: 'Mes alertes' })
+    expect(zone).toHaveTextContent('Prévenez-moi si les œufs d’une bande baissent de plus de')
+    expect(zone).toHaveTextContent('Pour BANDE 6 (≈ 2100 œufs par jour), 15 % ≈ 11 plateaux de moins par jour.')
+    const champ = within(zone).getByLabelText('Baisse des œufs (%)')
     await u.clear(champ)
     await u.type(champ, '20')
-    await u.click(screen.getByRole('button', { name: 'Enregistrer les seuils' }))
-    expect(enregistrer).toHaveBeenCalledWith('reglages', { id: 1, seuils: { baisse_pct: 20, mortalite_pour_mille: 5, jours_sauvegarde: 7, jours_dette: 30 } })
+    await u.click(screen.getByRole('button', { name: 'Enregistrer les alertes' }))
+    expect(enregistrer).toHaveBeenCalledWith('reglages', { id: 1, seuils: { baisse_pct: 20, alerte_mortalite: false, mortalite_pour_mille: 5, jours_sauvegarde: 7, jours_dette: 30 } })
+  })
+  it('l’alerte de mortalité est facultative', async () => {
+    const { u, enregistrer } = afficher(<Reglages />)
+    expect(screen.queryByLabelText('Mortalité (pour mille par jour)')).not.toBeInTheDocument()
+    await u.click(screen.getByRole('checkbox', { name: /Me prévenir aussi en cas de morts/ }))
+    expect(screen.getByLabelText('Mortalité (pour mille par jour)')).toHaveValue('5')
+    await u.click(screen.getByRole('button', { name: 'Enregistrer les alertes' }))
+    expect(enregistrer).toHaveBeenCalledWith('reglages', { id: 1, seuils: expect.objectContaining({ alerte_mortalite: true }) })
+  })
+  it('range les réglages en 4 rubriques, la courbe repliée dans « Avancé »', () => {
+    afficher(<Reglages />)
+    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Mes produits et prix', 'Mes boxes et ouvriers', 'Mes alertes', 'Mon compte et sauvegarde'])
+    expect(screen.getByText('Avancé : courbe de ponte attendue').closest('details')).not.toHaveAttribute('open')
+    expect(screen.getByRole('img', { name: /Courbe de ponte : sommet 93 % à 30 semaines/ })).toBeInTheDocument()
   })
 })
 
@@ -142,6 +190,15 @@ describe('Réglages : conditionnements et inventaire', () => {
     expect(enregistrer).toHaveBeenCalledWith('reglages', expect.objectContaining({
       id: 1, conditionnements: expect.arrayContaining([{ nom: 'Plateau de 30', oeufs: 30 }, { nom: 'Plateau de 20', oeufs: 20 }]),
     }))
+  })
+  it('enregistre l’inventaire par calibre', async () => {
+    const { u, enregistrer } = afficher(<Reglages />)
+    const zone = screen.getByRole('region', { name: 'Inventaire des œufs' })
+    await u.type(within(zone).getByLabelText(/^Gros/), '40')
+    await u.type(within(zone).getByLabelText(/^Petit/), '10')
+    await u.type(within(zone).getByLabelText('+ œufs'), '5')
+    await u.click(within(zone).getByRole('button', { name: 'Enregistrer l’inventaire' }))
+    expect(enregistrer).toHaveBeenCalledWith('reglages', { id: 1, stock_depart: { date: '2026-10-31', oeufs: 1505, par_calibre: { gros: 1200, petit: 300 } } })
   })
   it('enregistre l’inventaire du stock d’œufs du jour', async () => {
     const { u, enregistrer } = afficher(<Reglages />)

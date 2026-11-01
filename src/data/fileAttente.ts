@@ -1,6 +1,6 @@
 import { createStore, get, set } from 'idb-keyval'
 
-export type NomTable = 'clients' | 'produits' | 'ouvriers' | 'transactions' | 'paiements' | 'bandes' | 'ponte' | 'reglages' | 'profils' | 'recensements' | 'mortalites'
+export type NomTable = 'clients' | 'produits' | 'ouvriers' | 'transactions' | 'paiements' | 'bandes' | 'ponte' | 'reglages' | 'profils' | 'recensements' | 'mortalites' | 'ramassages'
 
 export type Operation = {
   id: string

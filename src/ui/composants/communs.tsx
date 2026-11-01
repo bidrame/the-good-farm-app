@@ -6,18 +6,20 @@ import type { Genre } from '../icones'
 import { Pastille } from './Pastille'
 
 /** `hausseMauvaise` : pour les dépenses, une hausse s'affiche en rouge. */
-export function CarteMetrique({ libelle, valeur, variation, hausseMauvaise = false, genre, teinteValeur }: {
+export function CarteMetrique({ libelle, valeur, variation, hausseMauvaise = false, genre, teinteValeur, detail }: {
   libelle: string; valeur: string; variation?: number | null; hausseMauvaise?: boolean; genre?: Genre; teinteValeur?: 'entree' | 'sortie' | 'du'
+  detail?: ReactNode
 }) {
   return (
     <div className="metrique">
       {genre ? <div className="tete"><Pastille genre={genre} petite /><span className="discret">{libelle}</span></div> : <div className="discret">{libelle}</div>}
       <div className={`valeur${teinteValeur ? ` ${teinteValeur}` : ''}`}>{valeur}</div>
       {variation != null && Number.isFinite(variation) && (
-        <div className={(variation >= 0) !== hausseMauvaise ? 'ok' : 'mauvais'} style={{ fontSize: 13 }}>
-          {variation >= 0 ? '▲' : '▼'} {Math.abs(Math.round(variation * 100))} %
+        <div className={(variation >= 0) !== hausseMauvaise ? 'ok' : 'mauvais'} style={{ fontSize: 14 }}>
+          {variation >= 0 ? '▲' : '▼'} {Math.abs(Math.round(variation * 100))} % {variation >= 0 ? 'de plus' : 'de moins'}
         </div>
       )}
+      {detail}
     </div>
   )
 }

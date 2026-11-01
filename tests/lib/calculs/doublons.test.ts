@@ -25,3 +25,28 @@ describe('estDoublonTransaction', () => {
     expect(estDoublonTransaction({ ...t, id: 'n', montant: 1 }, [t])).toBe(false)
   })
 })
+
+describe('Personnes semblables à l’ajout', () => {
+  const gens = [
+    { id: 'a', nom: 'Moussa Diop', telephone: '+221 77 123 45 67' },
+    { id: 'b', nom: 'Mame-Diarra' },
+    { id: 'c', nom: 'Cheikh' },
+    { id: 'd', nom: 'Ancien', supprime_le: '2026-01-01' },
+  ]
+  it('bloque le même nom, même écrit autrement', async () => {
+    const { personnesSemblables } = await import('../../../src/lib/calculs/doublons')
+    expect(personnesSemblables('mame diarra', null, gens).identique?.id).toBe('b')
+    expect(personnesSemblables('MOUSSA  DIOP', null, gens).identique?.id).toBe('a')
+  })
+  it('bloque un numéro déjà enregistré, quel que soit le format', async () => {
+    const { personnesSemblables } = await import('../../../src/lib/calculs/doublons')
+    expect(personnesSemblables('Autre nom', '77 123 45 67', gens).memeNumero?.id).toBe('a')
+  })
+  it('signale les noms proches : faute de frappe, nom complet ou abrégé', async () => {
+    const { personnesSemblables } = await import('../../../src/lib/calculs/doublons')
+    expect(personnesSemblables('Mousa Diop', null, gens).proches.map((p) => p.id)).toEqual(['a'])
+    expect(personnesSemblables('Cheikh Fall', null, gens).proches.map((p) => p.id)).toEqual(['c'])
+    expect(personnesSemblables('Ibrahima', null, gens)).toEqual({ identique: undefined, memeNumero: undefined, proches: [] })
+    expect(personnesSemblables('Ancien', null, gens).identique).toBeUndefined()
+  })
+})

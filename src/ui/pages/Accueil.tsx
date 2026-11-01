@@ -1,20 +1,19 @@
+import { IconBell } from '@tabler/icons-react'
 import { Link } from 'react-router-dom'
 import { useDonnees } from '../../data/useDonnees'
-import { calculerAlertes } from '../../lib/calculs/alertes'
-import { bandesEnProduction } from '../../lib/calculs/bandes'
-import { fiabiliteEffectif } from '../../lib/calculs/effectifs'
-import { couleurTendance, oeufsFerme, tendanceOeufs } from '../../lib/calculs/suiviOeufs'
-import { bilanMensuel } from '../../lib/calculs/bilans'
+import { etatAliment, JOURS_ALERTE_ALIMENT } from '../../lib/calculs/aliment'
+import { boxesFerme } from '../../lib/calculs/boxes'
+import { CALIBRES, nomCle, ORDRE_CLES, stockParCalibre } from '../../lib/calculs/calibres'
+import { bilanMensuel, tresorerieMois } from '../../lib/calculs/bilans'
 import { soldesClients } from '../../lib/calculs/credits'
 import { dettesFournisseurs } from '../../lib/calculs/dettes'
 import { OEUFS_PAR_PLATEAU, decomposer, stockOeufs } from '../../lib/calculs/oeufs'
-import { ajouterJours, aujourdhui, formatFCFA } from '../../lib/format'
+import { aujourdhui, formatFCFA } from '../../lib/format'
 import { Compteur } from '../composants/animations'
 import { Alerte, CarteMetrique } from '../composants/communs'
 import { Oeuf } from '../composants/Oeuf'
 import { Pastille } from '../composants/Pastille'
-import { ICONES, TAILLE } from '../icones'
-import { teinteBande } from '../bandes'
+import { useAlertes } from '../useAlertes'
 
 const NOMS_MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre']
 
@@ -27,19 +26,10 @@ function moisPrecedent(periode: string): string {
   return m === 1 ? `${a - 1}-12` : `${a}-${String(m - 1).padStart(2, '0')}`
 }
 
-// Flèche de tendance ; « = » quand l'écart arrondi est nul.
-const fleche = (ecart: number) => (Math.round(ecart * 100) === 0 ? '=' : ecart > 0 ? '▲' : '▼')
-
-const RACCOURCIS = [
-  { vers: '/saisir', libelle: 'Vente', Icone: ICONES.vente, fond: 'var(--vert)', texte: 'var(--sur-vert)' },
-  { vers: '/ponte', libelle: 'Ponte', Icone: ICONES.ponte, fond: 'var(--jaune)', texte: '#3d2a00' },
-  { vers: '/saisir?type=depense', libelle: 'Dépense', Icone: ICONES.depense, fond: 'var(--t-rouge-fond)', texte: 'var(--t-rouge)' },
-]
 
 export function Accueil() {
-  const { transactions, paiements, clients, produits, bandes, ponte, recensements, mortalites, reglages, enAttente } = useDonnees()
+  const { transactions, paiements, clients, produits, bandes, ponte, reglages } = useDonnees()
   const ref = aujourdhui()
-  const hier = ajouterJours(ref, -1)
   const r = reglages[0]
 
   const mois = ref.slice(0, 7)
@@ -49,24 +39,17 @@ export function Accueil() {
   const avant = bilan.find((l) => l.periode === moisPrecedent(mois))
   const credits = soldesClients(clients, transactions, paiements).filter((s) => s.solde > 0).reduce((t, s) => t + s.solde, 0)
   const dettes = dettesFournisseurs(clients, transactions, paiements, ref)
+  const caisse = tresorerieMois(transactions, paiements, mois)
   // Écart en francs : un pourcentage n'a pas de sens quand le résultat est négatif.
   const ecartResultat = avant ? ce.resultat - avant.resultat : null
   const nomMoisPrecedent = NOMS_MOIS[Number(moisPrecedent(mois).slice(5)) - 1]
 
-  const enProd = bandesEnProduction(bandes, ponte, ref)
-  const ponteHier = enProd.map((b) => {
-    const p = ponte.find((x) => x.bande_id === b.id && x.date === hier && !x.supprime_le)
-    return { b, p, tendance: p ? tendanceOeufs(b.id, ponte, hier) : null }
-  })
-  const oeufsHier = oeufsFerme(ponte, hier)
-  const totalHier = decomposer(oeufsHier, OEUFS_PAR_PLATEAU)
-  const joursAvant = Array.from({ length: 7 }, (_, i) => oeufsFerme(ponte, ajouterJours(hier, -1 - i))).filter((n) => n > 0)
-  const moyenneFerme = joursAvant.length ? joursAvant.reduce((s, n) => s + n, 0) / joursAvant.length : null
-  const evolutionFerme = moyenneFerme && oeufsHier ? (oeufsHier - moyenneFerme) / moyenneFerme : null
   const stock = r?.stock_depart ? decomposer(Math.max(0, stockOeufs({ pontes: ponte, transactions, produits, depart: r.stock_depart })), OEUFS_PAR_PLATEAU) : null
+  const stockCalibres = r?.stock_depart ? stockParCalibre({ pontes: ponte, transactions, produits, depart: r.stock_depart, bandes, boxes: boxesFerme(r, bandes) }) : {}
 
-  const aVerifier = enProd.filter((b) => fiabiliteEffectif(b, { pontes: ponte, recensements, mortalites }, hier, r?.courbe_attendue).incoherent)
-  const alertes = calculerAlertes({ ref, heure: new Date().getHours(), bandes, pontes: ponte, derniereSauvegarde: r?.derniere_sauvegarde ?? null, seuils: r?.seuils, dettes: dettes.lignes })
+  const { nouvelles, total: nbAlertes, marquerVue } = useAlertes()
+  const aliment = etatAliment({ transactions, pontes: ponte, produits, reglage: r?.aliment }, ref)
+  const premiere = nouvelles[0]
 
   return (
     <main>
@@ -76,78 +59,74 @@ export function Accueil() {
           <div className="discret">Bonjour · {nomMois}</div>
           <h1 style={{ margin: 0 }}>The Good Farm</h1>
         </div>
+        <Link to="/alertes" className="cloche" aria-label={nouvelles.length ? `Alertes : ${nouvelles.length} à voir` : 'Alertes'}>
+          <IconBell size={26} stroke={1.75} aria-hidden="true" />
+          {nouvelles.length > 0 && (
+            <span className={`pastille-nombre ${nouvelles.some((a) => a.niveau === 'danger') ? 'danger' : 'attention'}`} aria-hidden="true">{nouvelles.length}</span>
+          )}
+        </Link>
       </div>
 
-      <div className="vedette">
+      {stock ? (
+        <Link to="/stock" className="stock-accueil" style={{ color: 'inherit', textDecoration: 'none' }}>
+          <CarteMetrique genre="stock" libelle="Stock d’œufs au magasin" valeur={`${stock.lots} plateaux${stock.restants ? ` + ${stock.restants}` : ''}`}
+            detail={CALIBRES.some((c) => stockCalibres[c]) && (
+              <div className="stock-calibres" aria-label="Stock par calibre">
+                {ORDRE_CLES.filter((k) => stockCalibres[k]).map((k) => (
+                  <span key={k}><span className={`pastille-calibre ${k}`}>{nomCle(k)}</span> {Math.floor(stockCalibres[k]! / OEUFS_PAR_PLATEAU)}</span>
+                ))}
+              </div>
+            )} />
+        </Link>
+      ) : (
+        <Link to="/reglages" className="metrique stock-accueil" style={{ color: 'var(--vert)', textDecoration: 'none', fontWeight: 700 }}>
+          <div className="tete"><Pastille genre="stock" petite /><span className="discret">Stock d’œufs</span></div>Faire l’inventaire →
+        </Link>
+      )}
+
+      <div className={`vedette${ce.resultat < 0 ? ' vedette-perte' : ''}`}>
         <div className="discret">Résultat de {nomMois}</div>
         <div className="grand" data-testid="resultat"><Compteur valeur={ce.resultat} format={formatFCFA} /></div>
         {ecartResultat != null && (
           <div className="variation">{ecartResultat >= 0 ? `▲ +${formatFCFA(ecartResultat)}` : `▼ ${formatFCFA(ecartResultat)}`} par rapport à {nomMoisPrecedent}</div>
         )}
       </div>
+      <p className="tresorerie" aria-label="Trésorerie du mois">
+        Argent réellement entré : <strong className="entree">{formatFCFA(caisse.entre)}</strong>
+        {' · '}sorti : <strong className="sortie">{formatFCFA(caisse.sorti)}</strong>
+        {' · '}encore à payer aux fournisseurs : <strong className={dettes.total > 0 ? 'du' : ''}>{formatFCFA(dettes.total)}</strong>
+      </p>
 
-      <nav aria-label="Raccourcis" className="raccourcis">
-        {RACCOURCIS.map(({ vers, libelle, Icone, fond, texte }) => (
-          <Link key={vers} to={vers} style={{ background: fond, color: texte }}>
-            <Icone size={TAILLE.carte + 4} stroke={1.75} aria-hidden="true" />{libelle}
+      {premiere && (
+        <div className="bandeau-alerte">
+          <Link to="/alertes" aria-label="Voir les alertes">
+            <Alerte alerte={{ ...premiere, message: `${premiere.message}${nouvelles.length > 1 ? ` · et ${nouvelles.length - 1} autre${nouvelles.length > 2 ? 's' : ''}` : ''} →` }} />
           </Link>
-        ))}
-      </nav>
-
-      {enAttente > 0 && <div className="alerte attention">En attente d’envoi ({enAttente})</div>}
-      {alertes.map((a, i) => <Alerte key={i} alerte={a} />)}
-      {aVerifier.length > 0 && (
-        <Link to={`/bandes/${aVerifier[0].id}`} style={{ textDecoration: 'none' }}>
-          <Alerte alerte={{ niveau: 'attention', code: 'effectif_a_verifier', message: `Effectif à vérifier : ${aVerifier.map((b) => b.nom).join(', ')}. La ponte ne correspond pas au nombre de poules noté ; recomptez pour des taux fiables →` }} />
-        </Link>
+          <button className={`vu-bandeau ${premiere.niveau}`} onClick={() => marquerVue(premiere.cle)} aria-label="Marquer cette alerte comme vue">Vu</button>
+        </div>
       )}
+      {nbAlertes === 0 && <div className="alerte info" role="status">Tout va bien aujourd’hui ✓</div>}
 
       <div className="grille2" style={{ margin: '4px 0 12px' }}>
-        <CarteMetrique genre="vente" libelle="Ventes" valeur={formatFCFA(ce.ventes)} variation={variation(ce.ventes, avant?.ventes)} />
-        <CarteMetrique genre="depense" libelle="Dépenses" valeur={formatFCFA(ce.depenses)} variation={variation(ce.depenses, avant?.depenses)} hausseMauvaise />
+        <Link to="/saisir" aria-label="Saisir une vente" style={{ color: 'inherit', textDecoration: 'none' }}>
+          <CarteMetrique genre="vente" libelle="Ventes" valeur={formatFCFA(ce.ventes)} variation={variation(ce.ventes, avant?.ventes)} />
+        </Link>
+        <Link to="/saisir?type=depense" aria-label="Saisir une dépense" style={{ color: 'inherit', textDecoration: 'none' }}>
+          <CarteMetrique genre="depense" libelle="Dépenses" valeur={formatFCFA(ce.depenses)} variation={variation(ce.depenses, avant?.depenses)} hausseMauvaise />
+        </Link>
         <Link to="/clients" style={{ color: 'inherit', textDecoration: 'none' }}>
           <CarteMetrique genre="credit" libelle="Crédits dus" valeur={formatFCFA(credits)} teinteValeur={credits > 0 ? 'du' : undefined} />
         </Link>
         <Link to="/fournisseurs" style={{ color: 'inherit', textDecoration: 'none' }}>
           <CarteMetrique genre="aPayer" libelle="À payer" valeur={formatFCFA(dettes.total)} teinteValeur={dettes.total > 0 ? 'du' : undefined} />
         </Link>
-        {stock ? (
-          <CarteMetrique genre="stock" libelle="Stock d’œufs" valeur={`${stock.lots} plateaux${stock.restants ? ` + ${stock.restants}` : ''}`} />
-        ) : (
-          <Link to="/reglages" className="metrique" style={{ color: 'var(--vert)', textDecoration: 'none', fontWeight: 700 }}>
-            <div className="tete"><Pastille genre="stock" petite /><span className="discret">Stock d’œufs</span></div>Faire l’inventaire →
-          </Link>
-        )}
+        <Link to="/aliment" style={{ color: 'inherit', textDecoration: 'none' }}>
+          <CarteMetrique genre="aliment" libelle="Aliment"
+            valeur={aliment.jours != null ? `≈ ${aliment.jours} jour${aliment.jours > 1 ? 's' : ''}` : 'Compter les sacs →'}
+            teinteValeur={aliment.jours != null && aliment.jours <= (r?.aliment?.jours_alerte || JOURS_ALERTE_ALIMENT) ? 'du' : undefined} />
+        </Link>
       </div>
 
-      <section aria-label="Ponte d’hier" className="carte">
-        <h2 className="entete-ligne" style={{ marginTop: 0 }}><Pastille genre="ponte" petite />Ponte d’hier</h2>
-        {ponteHier.map(({ b, p, tendance }) => {
-          const classe = tendance ? couleurTendance(tendance.ecart, r?.seuils?.baisse_pct) : ''
-          return (
-            <div key={b.id} className="ligne">
-              <span><span className="point-bande" style={{ background: teinteBande(b) }} aria-hidden="true" />{b.nom} <span className="discret">box {b.box}</span></span>
-              {p == null ? <span className="discret">non saisie</span> : (
-                <span style={{ textAlign: 'right' }}>
-                  <strong>{p.oeufs_collectes} œufs</strong>
-                  {tendance && <span className={classe} style={{ display: 'block', fontSize: 12, fontWeight: 700 }}>{fleche(tendance.ecart)} {Math.abs(Math.round(tendance.ecart * 100))} % vs 7 j</span>}
-                </span>
-              )}
-            </div>
-          )
-        })}
-        <div className="ligne" style={{ borderTop: '1px solid var(--bord)', marginTop: 6 }}>
-          <span>Ferme</span>
-          <span style={{ textAlign: 'right' }}>
-            <strong>{oeufsHier} œufs · {totalHier.lots} plateaux + {totalHier.restants}</strong>
-            {evolutionFerme != null && (
-              <span data-testid="evolution-ferme" className={couleurTendance(evolutionFerme, r?.seuils?.baisse_pct)} style={{ display: 'block', fontSize: 12, fontWeight: 700 }}>
-                {fleche(evolutionFerme)} {Math.abs(Math.round(evolutionFerme * 100))} % par rapport à la moyenne de 7 jours
-              </span>
-            )}
-          </span>
-        </div>
-      </section>
     </main>
   )
 }

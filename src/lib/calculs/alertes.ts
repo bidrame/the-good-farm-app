@@ -6,7 +6,7 @@ import { tendanceOeufs } from './suiviOeufs'
 
 export type Alerte = { niveau: 'info' | 'attention' | 'danger'; code: string; message: string; bande_id?: string }
 
-export const SEUILS_DEFAUT: Seuils = { baisse_pct: 15, mortalite_pour_mille: 5, jours_sauvegarde: 7, jours_dette: 30 }
+export const SEUILS_DEFAUT: Seuils = { baisse_pct: 15, alerte_mortalite: false, mortalite_pour_mille: 5, jours_sauvegarde: 7, jours_dette: 30 }
 export const HEURE_RAPPEL_PONTE = 18
 export const SEMAINES_ALERTE_REFORME = 60
 export const SEMAINES_REFORME = 72
@@ -44,7 +44,7 @@ export function calculerAlertes({ ref, heure, bandes, pontes, derniereSauvegarde
         message: `${b.nom} : ${t.oeufs} œufs le ${formatDate(jour).slice(0, 5)}, −${Math.round(-t.ecart * 100)} % par rapport à sa moyenne de 7 jours (${Math.round(t.moyenne)})`,
       })
 
-    for (const date of [ref, ajouterJours(ref, -1)]) {
+    if (s.alerte_mortalite) for (const date of [ref, ajouterJours(ref, -1)]) {
       const p = pontesVivantes.find((x) => x.bande_id === b.id && x.date === date)
       const effectif = effectifPresent(b, pontes, date)
       if (p && effectif > 0 && p.mortalite / effectif > s.mortalite_pour_mille / 1000) {

@@ -45,9 +45,14 @@ describe('calculerAlertes', () => {
   })
   it('signale une mortalité au-dessus de 0,5 % de l’effectif (hier ou aujourd’hui)', () => {
     const p = [...base.pontes.slice(0, -1), { ...base.pontes[13], mortalite: 4 }]
-    expect(codes(calculerAlertes({ ...base, pontes: p }))).toEqual(['mortalite'])
+    const seuils = { alerte_mortalite: true }
+    expect(codes(calculerAlertes({ ...base, pontes: p, seuils }))).toEqual(['mortalite'])
     const p2 = [...base.pontes.slice(0, -1), { ...base.pontes[13], mortalite: 2 }]
-    expect(codes(calculerAlertes({ ...base, pontes: p2 }))).toEqual([])
+    expect(codes(calculerAlertes({ ...base, pontes: p2, seuils }))).toEqual([])
+  })
+  it('ne signale pas la mortalité tant que l’alerte n’est pas activée', () => {
+    const p = [...base.pontes.slice(0, -1), { ...base.pontes[13], mortalite: 40 }]
+    expect(codes(calculerAlertes({ ...base, pontes: p }))).toEqual([])
   })
   it('annonce la réforme à planifier dès 60 semaines', () => {
     const b = { ...BANDES[3] } // née le 13/08/2025 : 63 semaines, 72 semaines le 30/12/2026

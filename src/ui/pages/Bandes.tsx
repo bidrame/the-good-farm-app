@@ -7,7 +7,7 @@ import { fiabiliteEffectif } from '../../lib/calculs/effectifs'
 import { ajouterJours, aujourdhui, formatDate } from '../../lib/format'
 import type { Bande, Box, BoxFerme } from '../../lib/types'
 import { ChampMontant } from '../composants/communs'
-import { Titre } from '../composants/Pastille'
+import { Titre, BoutonAjout } from '../composants/Pastille'
 import { teinteBande } from '../bandes'
 
 
@@ -76,36 +76,6 @@ function NouvelleBande({ libres, boxes, onFini }: { libres: Box[]; boxes: BoxFer
   )
 }
 
-/** Liste des boxes : la bande qui l'occupe, l'ouvrier qui s'en occupe, et l'ajout d'un box. */
-function BoxesEtOuvriers({ boxes, actives }: { boxes: BoxFerme[]; actives: Bande[] }) {
-  const { ouvriers, enregistrer } = useDonnees()
-  const sauver = (liste: BoxFerme[]) => enregistrer('reglages', { id: 1, boxes: liste })
-  const dernier = boxes[boxes.length - 1]
-  const dernierLibre = boxes.length > 1 && !actives.some((b) => b.box === dernier.numero)
-  return (
-    <section aria-label="Boxes et ouvriers" className="carte">
-      <h2 style={{ marginTop: 0 }}>Boxes et ouvriers</h2>
-      {boxes.map((x) => {
-        const bande = actives.find((b) => b.box === x.numero)
-        return (
-          <label key={x.numero} className="ligne" style={{ marginBottom: 0 }}>
-            <span style={{ color: 'var(--texte)' }}>Box {x.numero} <span className="discret">{bande ? `· ${bande.nom}` : '· libre'}</span></span>
-            <select style={{ width: '52%', marginTop: 0 }} value={x.ouvrier_id ?? ''}
-              onChange={(e) => sauver(boxes.map((y) => (y.numero === x.numero ? { ...y, ouvrier_id: e.target.value || null } : y)))}>
-              <option value="">Sans ouvrier</option>
-              {ouvriers.filter((o) => !o.supprime_le && (o.actif || o.id === x.ouvrier_id)).map((o) => <option key={o.id} value={o.id}>{o.nom}</option>)}
-            </select>
-          </label>
-        )
-      })}
-      <div className={dernierLibre ? 'grille2' : ''} style={{ marginTop: 8 }}>
-        <button style={{ width: '100%' }} onClick={() => sauver([...boxes, { numero: (dernier?.numero ?? 0) + 1, ouvrier_id: null }])}>Ajouter un box</button>
-        {dernierLibre && <button onClick={() => sauver(boxes.slice(0, -1))}>Retirer le box {dernier.numero}</button>}
-      </div>
-    </section>
-  )
-}
-
 export function Bandes() {
   const { bandes, reglages } = useDonnees()
   const [creation, setCreation] = useState(false)
@@ -118,9 +88,9 @@ export function Bandes() {
     <main>
       <Titre genre="bande">Bandes</Titre>
       {actives.map((b) => <LigneBande key={b.id} b={b} />)}
-      <button onClick={() => setCreation((c) => !c)} style={{ width: '100%', marginBottom: 10 }}>Nouvelle bande</button>
+      <BoutonAjout onClick={() => setCreation((c) => !c)} style={{ width: '100%', marginBottom: 10 }}>Nouvelle bande</BoutonAjout>
       {creation && <NouvelleBande libres={libres} boxes={boxes} onFini={() => setCreation(false)} />}
-      <BoxesEtOuvriers boxes={boxes} actives={actives} />
+      <Link to="/reglages" className="carte lien-carte">Boxes, ouvriers et calibres : dans les Réglages →</Link>
       {reformees.length > 0 && (
         <section aria-label="Bandes réformées">
           <h2>Bandes réformées</h2>

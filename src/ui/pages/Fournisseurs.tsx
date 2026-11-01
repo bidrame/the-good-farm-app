@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { NouvelleFiche } from '../composants/NouvelleFiche'
 import { Link } from 'react-router-dom'
 import { useDonnees } from '../../data/useDonnees'
 import { cleNom } from '../../lib/calculs/doublons'
@@ -18,6 +19,7 @@ export function Fournisseurs() {
   return (
     <main>
       <Titre genre="fournisseur">Fournisseurs et dettes</Titre>
+      <NouvelleFiche genre="fournisseur" />
       <div className="metrique" style={{ marginBottom: 12 }}>
         <div className="discret">Total à payer</div>
         <div className="valeur" data-testid="total-a-payer">{formatFCFA(total)}</div>

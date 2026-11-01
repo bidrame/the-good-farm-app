@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { NouvelleFiche } from '../composants/NouvelleFiche'
 import { Link } from 'react-router-dom'
 import { useDonnees } from '../../data/useDonnees'
 import { soldesClients } from '../../lib/calculs/credits'
@@ -17,6 +18,7 @@ export function Clients() {
   return (
     <main>
       <Titre genre="client">Clients et crédits</Titre>
+      <NouvelleFiche genre="client" />
       <div className="metrique" style={{ marginBottom: 12 }}>
         <div className="discret">Total à encaisser</div>
         <div className="valeur" data-testid="total-du">{formatFCFA(totalDu)}</div>

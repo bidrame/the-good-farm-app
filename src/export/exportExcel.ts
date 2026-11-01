@@ -1,3 +1,4 @@
+import { nomCalibre } from '../lib/calculs/calibres'
 import * as XLSX from 'xlsx'
 import type { Donnees } from '../data/useDonnees'
 import { boxesFerme, ouvrierDuBox } from '../lib/calculs/boxes'
@@ -43,12 +44,13 @@ export function construireClasseur(d: Donnees, ref: DateISO): XLSX.WorkBook {
     'Prix unitaire': t.prix_unitaire,
     Quantité: t.quantite,
     'Œufs par unité': t.type === 'vente' && estProduitOeufs(d.produits.find((p) => p.id === t.produit_id)) ? t.oeufs_par_unite ?? OEUFS_PAR_PLATEAU : null,
+    Calibre: t.calibre ? nomCalibre(t.calibre) : '',
     Montant: t.type === 'vente' ? t.montant : -t.montant,
     'Montant payé': t.type === 'vente' ? t.montant_paye : null,
     Reste: t.type === 'vente' ? t.montant - t.montant_paye : null,
     Observation: t.observation ?? '',
     'Saisi par': auteur(t.cree_par),
-  })), ['Date', 'Type', 'Client', 'Produit', 'Prix unitaire', 'Quantité', 'Œufs par unité', 'Montant', 'Montant payé', 'Reste', 'Observation', 'Saisi par']), 'Transactions')
+  })), ['Date', 'Type', 'Client', 'Produit', 'Prix unitaire', 'Quantité', 'Œufs par unité', 'Calibre', 'Montant', 'Montant payé', 'Reste', 'Observation', 'Saisi par']), 'Transactions')
 
   XLSX.utils.book_append_sheet(wb, feuille(d.paiements.filter((p) => !p.supprime_le).sort((a, b) => b.date.localeCompare(a.date)).map((p) => ({
     Date: dateExcel(p.date), Sens: p.sens === 'fournisseur' ? 'Fournisseur' : 'Client', Nom: nom(d.clients, p.client_id),
@@ -87,6 +89,13 @@ export function construireClasseur(d: Donnees, ref: DateISO): XLSX.WorkBook {
   XLSX.utils.book_append_sheet(wb, feuille(d.mortalites.filter((m) => !m.supprime_le).sort((a, b) => b.date.localeCompare(a.date)).map((m) => ({
     Date: dateExcel(m.date), Bande: nom(d.bandes, m.bande_id), Morts: m.nombre, Observation: m.observation ?? '',
   })), ['Date', 'Bande', 'Morts', 'Observation']), 'Mortalités')
+
+  XLSX.utils.book_append_sheet(wb, feuille(d.ramassages.filter((r) => !r.supprime_le).sort((a, b) => b.date.localeCompare(a.date)).flatMap((r) =>
+    r.lignes.map((l) => ({
+      Date: dateExcel(r.date), Du: dateExcel(r.du), Box: l.numero || 'magasin', Calibre: l.calibre ? nomCalibre(l.calibre) : '',
+      'Œufs attendus': l.theorique, 'Œufs chargés': l.charge, 'Dont du matin': l.matin ?? 0, Écart: l.charge - (l.matin ?? 0) - l.theorique,
+      Observation: r.observation ?? '',
+    }))), ['Date', 'Du', 'Box', 'Calibre', 'Œufs attendus', 'Œufs chargés', 'Dont du matin', 'Écart', 'Observation']), 'Livraisons')
 
   XLSX.utils.book_append_sheet(wb, feuille(bilanMensuel(d.transactions).map((l) => ({
     Mois: l.periode, Ventes: l.ventes, Dépenses: l.depenses, Résultat: l.resultat, Cumul: l.cumul,

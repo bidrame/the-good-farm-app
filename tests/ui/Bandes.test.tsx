@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { Bandes } from '../../src/ui/pages/Bandes'
 import { BandeFiche } from '../../src/ui/pages/BandeFiche'
+import { Reglages } from '../../src/ui/pages/Reglages'
 import { DonneesFixes } from '../../src/data/useDonnees'
 import { BANDES, ponte } from '../fixtures/bandes'
 import type { Bande, Recensement } from '../../src/lib/types'
@@ -23,6 +24,7 @@ function afficher(chemin: string, bandes: Bande[] = BANDES, recensements: Recens
         <Routes>
           <Route path="/bandes" element={<Bandes />} />
           <Route path="/bandes/:id" element={<BandeFiche />} />
+          <Route path="/reglages" element={<Reglages />} />
         </Routes>
       </MemoryRouter>
     </DonneesFixes>,
@@ -114,7 +116,7 @@ const OUVRIERS = [{ id: 'o1', nom: 'FALLOU', actif: true }, { id: 'o2', nom: 'DA
 
 describe('Boxes et ouvriers', () => {
   it('affecte un ouvrier à un box', async () => {
-    const { u, enregistrer } = afficher('/bandes', BANDES, [], { ouvriers: OUVRIERS })
+    const { u, enregistrer } = afficher('/reglages', BANDES, [], { ouvriers: OUVRIERS })
     const zone = screen.getByRole('region', { name: 'Boxes et ouvriers' })
     await u.selectOptions(within(zone).getByLabelText(/Box 2/), 'o2')
     expect(enregistrer).toHaveBeenCalledWith('reglages', { id: 1, boxes: [
@@ -122,9 +124,20 @@ describe('Boxes et ouvriers', () => {
     ] })
   })
 
+  it('marque le calibre d’un box d’un toucher, et l’efface en touchant à nouveau', async () => {
+    const boxes = [1, 2, 3, 4].map((numero) => ({ numero, ouvrier_id: null, calibre: numero === 4 ? ('petit' as const) : null }))
+    const { u, enregistrer } = afficher('/reglages', BANDES, [], { reglages: [{ id: 1, boxes }] })
+    const box1 = screen.getByRole('group', { name: 'Calibre du box 1' })
+    await u.click(within(box1).getByRole('button', { name: 'Gros' }))
+    expect(enregistrer).toHaveBeenCalledWith('reglages', { id: 1, boxes: expect.arrayContaining([{ numero: 1, ouvrier_id: null, calibre: 'gros' }]) })
+    const box4 = screen.getByRole('group', { name: 'Calibre du box 4' })
+    expect(within(box4).getByRole('button', { name: 'Petit' })).toHaveAttribute('aria-pressed', 'true')
+    await u.click(within(box4).getByRole('button', { name: 'Petit' }))
+    expect(enregistrer).toHaveBeenCalledWith('reglages', { id: 1, boxes: expect.arrayContaining([{ numero: 4, ouvrier_id: null, calibre: null }]) })
+  })
+
   it('ajoute un 5e box, où l’on peut ensuite créer une bande', async () => {
     const { u, enregistrer } = afficher('/bandes', BANDES, [], { ouvriers: OUVRIERS, reglages: [{ id: 1, boxes: [1, 2, 3, 4, 5].map((numero) => ({ numero, ouvrier_id: numero === 5 ? 'o1' : null })) }] })
-    expect(within(screen.getByRole('region', { name: 'Boxes et ouvriers' })).getByText(/libre/)).toBeInTheDocument()
     await u.click(screen.getByRole('button', { name: 'Nouvelle bande' }))
     expect([...(screen.getByLabelText('Box') as HTMLSelectElement).options].map((o) => o.value)).toEqual(['5'])
     await u.type(screen.getByLabelText('Nom'), 'BANDE 7')
@@ -134,9 +147,20 @@ describe('Boxes et ouvriers', () => {
     expect(enregistrer).toHaveBeenCalledWith('bandes', expect.objectContaining({ box: 5, ouvrier_id: 'o1' }))
   })
 
-  it('le bouton « Ajouter un box » enregistre un box de plus', async () => {
-    const { u, enregistrer } = afficher('/bandes', BANDES, [], { ouvriers: OUVRIERS })
-    await u.click(screen.getByRole('button', { name: 'Ajouter un box' }))
+  it('montre dans les réglages un box sans bande comme libre', () => {
+    afficher('/reglages', BANDES, [], { reglages: [{ id: 1, boxes: [1, 2, 3, 4, 5].map((numero) => ({ numero, ouvrier_id: null })) }] })
+    expect(within(screen.getByRole('region', { name: 'Boxes et ouvriers' })).getByText(/· libre/)).toBeInTheDocument()
+  })
+
+  it('range les boxes dans les réglages : la page Bandes n’y renvoie que par un lien', () => {
+    afficher('/bandes')
+    expect(screen.queryByRole('region', { name: 'Boxes et ouvriers' })).toBeNull()
+    expect(screen.getByRole('link', { name: /Boxes, ouvriers et calibres/ })).toHaveAttribute('href', '/reglages')
+  })
+
+  it('le bouton « Nouveau box » enregistre un box de plus', async () => {
+    const { u, enregistrer } = afficher('/reglages', BANDES, [], { ouvriers: OUVRIERS })
+    await u.click(screen.getByRole('button', { name: 'Nouveau box' }))
     expect(enregistrer).toHaveBeenCalledWith('reglages', { id: 1, boxes: expect.arrayContaining([{ numero: 5, ouvrier_id: null }]) })
   })
 

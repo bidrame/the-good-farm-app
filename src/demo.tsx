@@ -47,8 +47,9 @@ function donneesDemo(): Donnees {
     if (j % 30 === 0) transactions.push({ id: `s${j}`, date: ajouterJours(ref, -j), type: 'depense', client_id: null, produit_id: 'p6', prix_unitaire: 450000, quantite: 1, montant: 450000, montant_paye: 0 })
   }
   return { ...DONNEES_VIDES, produits, clients, bandes, ponte, transactions, recensements: [{ id: 'r1', bande_id: 'b5', date: ajouterJours(ref, -10), effectif: 600 }], ouvriers: [{ id: 'o1', nom: 'Ousmane', actif: true }, { id: 'o2', nom: 'Moussa', actif: true }, { id: 'o3', nom: 'Ibrahima', actif: true }],
+    ramassages: [{ id: 'ra1', date: ajouterJours(ref, -4), du: ajouterJours(ref, -10), lignes: [{ numero: 0, theorique: 6900, charge: 6780 + 1500, matin: 1500 }], repartition: [], observation: null }],
     mortalites: [{ id: 'm1', bande_id: 'b6', date: ajouterJours(ref, -4), nombre: 6, observation: 'chaleur' }],
-    profils: [{ id: 'demo', prenom: 'Démo' }], reglages: [{ id: 1, boxes: [{ numero: 1, ouvrier_id: 'o1' }, { numero: 2, ouvrier_id: 'o2' }, { numero: 3, ouvrier_id: 'o2' }, { numero: 4, ouvrier_id: 'o3' }, { numero: 5, ouvrier_id: null }], derniere_sauvegarde: ajouterJours(ref, -9), stock_depart: { date: ajouterJours(ref, -3), oeufs: 1500 } }] }
+    profils: [{ id: 'demo', prenom: 'Démo' }], reglages: [{ id: 1, boxes: [{ numero: 1, ouvrier_id: 'o1', calibre: 'gros' }, { numero: 2, ouvrier_id: 'o2', calibre: 'gros' }, { numero: 3, ouvrier_id: 'o2', calibre: 'moyen' }, { numero: 4, ouvrier_id: 'o3', calibre: 'petit' }, { numero: 5, ouvrier_id: null }], derniere_sauvegarde: ajouterJours(ref, -9), stock_depart: { date: ajouterJours(ref, -3), oeufs: 1500 }, aliment: { stock: { date: ajouterJours(ref, -5), sacs: 160 } } }] }
 }
 
 export function Demo() {

@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { Accueil } from '../../src/ui/pages/Accueil'
 import { DonneesFixes } from '../../src/data/useDonnees'
@@ -8,12 +9,13 @@ import { tx } from '../fixtures/tx'
 
 const esp = (s: string | null | undefined) => (s ?? '').replace(/\s/g, ' ')
 
-function afficher(heure = 10, enAttente = 0, stock?: { date: string; oeufs: number }) {
+function afficher(heure = 10, enAttente = 0, stock?: { date: string; oeufs: number }, extra: ReturnType<typeof tx>[] = []) {
   vi.setSystemTime(new Date(`2026-10-31T${String(heure).padStart(2, '0')}:00:00`))
   const d = ferme()
   d.transactions!.push(tx({ id: 'sept', date: '2026-09-15', client_id: 'c-dame', prix_unitaire: 50000 }))
   d.transactions!.push(tx({ id: 'sept-dep', date: '2026-09-15', type: 'depense', client_id: null, produit_id: 'p-alim', prix_unitaire: 40000 }))
   d.ponte = [ponte('b4', '2026-10-30', { oeufs_collectes: 520 })]
+  d.transactions!.push(...extra)
   if (stock) d.reglages = [{ id: 1, stock_depart: stock }]
   render(
     <DonneesFixes donnees={d} enAttente={enAttente}>
@@ -28,6 +30,17 @@ beforeEach(() => vi.useFakeTimers({ toFake: ['Date'] }))
 afterEach(() => vi.useRealTimers())
 
 describe('Accueil', () => {
+  it('montre une perte en rouge et dit si les montants montent ou baissent', () => {
+    afficher(10, 0, undefined, [tx({ id: 'grosse-dep', date: '2026-10-20', type: 'depense', client_id: null, produit_id: 'p-alim', prix_unitaire: 200000 })])
+    expect(screen.getByTestId('resultat').closest('.vedette')).toHaveClass('vedette-perte')
+    expect(esp(carte('Ventes').textContent)).toContain('▲ 59 % de plus')
+  })
+
+  it('garde le bandeau vert quand le mois est gagnant', () => {
+    afficher()
+    expect(screen.getByTestId('resultat').closest('.vedette')).not.toHaveClass('vedette-perte')
+  })
+
   it('résume le mois en cours avec la variation', () => {
     afficher()
     expect(esp(carte('Ventes').textContent)).toContain('79 500 F')
@@ -39,41 +52,69 @@ describe('Accueil', () => {
     expect(esp(carte('Crédits dus').textContent)).toContain('11 000 F')
   })
 
-  it('montre la ponte d’hier par box et le total ferme', () => {
+  it('sous le résultat, montre l’argent réellement entré et sorti et ce qu’il reste à payer', () => {
     afficher()
-    const zone = screen.getByRole('region', { name: 'Ponte d’hier' })
-    expect(esp(zone.textContent)).toContain('BANDE 4')
-    expect(esp(zone.textContent)).toContain('520 œufs')
-    expect(esp(zone.textContent)).toContain('17 plateaux + 10')
+    const ligne = screen.getByLabelText('Trésorerie du mois')
+    expect(ligne).toHaveTextContent(/Argent réellement entré : .+ · sorti : .+ · encore à payer aux fournisseurs : /)
+  })
+  it('range les alertes : une cloche avec leur nombre et un seul bandeau, la plus grave d’abord', () => {
+    afficher(19)
+    const cloche = screen.getByRole('link', { name: /^Alertes : \d+ à voir$/ })
+    expect(cloche).toHaveAttribute('href', '/alertes')
+    expect(cloche.querySelector('.pastille-nombre')).toHaveClass('danger')
+    const bandeau = screen.getByRole('link', { name: 'Voir les alertes' })
+    expect(bandeau).toHaveTextContent(/Ponte du jour pas encore saisie.* · et \d+ autres →/)
+    expect(screen.getAllByRole('status')).toHaveLength(1)
   })
 
-  it('compare la ferme à sa moyenne de 7 jours', () => {
+  it('« Vu » sur le bandeau range l’alerte et montre la suivante', async () => {
+    localStorage.clear()
+    afficher(19)
+    const avant = screen.getByRole('link', { name: 'Voir les alertes' }).textContent
+    await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(screen.getByRole('button', { name: 'Marquer cette alerte comme vue' }))
+    expect(screen.getByRole('link', { name: 'Voir les alertes' }).textContent).not.toBe(avant)
+    expect(screen.getByRole('link', { name: 'Voir les alertes' })).not.toHaveTextContent('Ponte du jour pas encore saisie')
+    localStorage.clear()
+  })
+
+  it('n’a plus de raccourcis (doublon du menu du bas) et met le stock avant le résultat du mois', () => {
+    afficher(10, 0, { date: '2026-10-29', oeufs: 820 })
+    expect(screen.queryByRole('navigation', { name: 'Raccourcis' })).toBeNull()
+    const stock = carte('Stock d’œufs au magasin')
+    const resultat = screen.getByTestId('resultat')
+    expect(stock.compareDocumentPosition(resultat) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('n’affiche plus la ponte d’hier : le détail est dans la page Stock', () => {
+    afficher()
+    expect(screen.queryByRole('region', { name: 'Ponte d’hier' })).toBeNull()
+  })
+
+  it('les cartes Ventes et Dépenses ouvrent la saisie', () => {
+    afficher()
+    expect(screen.getByRole('link', { name: 'Saisir une vente' })).toHaveAttribute('href', '/saisir')
+    expect(screen.getByRole('link', { name: 'Saisir une dépense' })).toHaveAttribute('href', '/saisir?type=depense')
+  })
+
+  it('la carte du stock ouvre la page Stock', () => {
+    afficher(10, 0, { date: '2026-10-29', oeufs: 820 })
+    expect(carte('Stock d’œufs au magasin').closest('a')).toHaveAttribute('href', '/stock')
+  })
+
+  it('détaille le stock du magasin par calibre', () => {
     vi.setSystemTime(new Date('2026-10-31T10:00:00'))
     const d = ferme()
-    d.ponte = [...Array.from({ length: 7 }, (_, i) => ponte('b4', `2026-10-${23 + i}`, { oeufs_collectes: 400 })), ponte('b4', '2026-10-30', { oeufs_collectes: 440 })]
+    d.ponte = []
+    d.reglages = [{ id: 1, stock_depart: { date: '2026-10-29', oeufs: 1200, par_calibre: { gros: 900, petit: 300 } },
+      boxes: [1, 2, 3, 4].map((numero) => ({ numero, ouvrier_id: null })) }]
+    d.transactions = []
     render(<DonneesFixes donnees={d}><MemoryRouter><Accueil /></MemoryRouter></DonneesFixes>)
-    expect(esp(screen.getByTestId('evolution-ferme').textContent)).toBe('▲ 10 % par rapport à la moyenne de 7 jours')
-  })
-
-  it('affiche les alertes, les plus graves d’abord', () => {
-    afficher(19)
-    const alertes = screen.getAllByRole('status').map((a) => a.textContent ?? '')
-    expect(alertes[0]).toContain('Ponte du jour pas encore saisie')
-    expect(alertes.some((a) => a.includes('BANDE 3 : 72 semaines atteintes'))).toBe(true)
-    expect(alertes.at(-1)).toContain('sauvegarde')
-  })
-
-  it('propose trois raccourcis : vente, ponte, dépense', () => {
-    afficher()
-    const zone = screen.getByRole('navigation', { name: 'Raccourcis' })
-    expect([...zone.querySelectorAll('a')].map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
-      ['Vente', '/saisir'], ['Ponte', '/ponte'], ['Dépense', '/saisir?type=depense'],
-    ])
+    expect(screen.getByLabelText('Stock par calibre')).toHaveTextContent('Gros 30Petit 10')
   })
 
   it('montre le stock d’œufs en plateaux', () => {
     afficher(10, 0, { date: '2026-10-29', oeufs: 300 })
-    expect(esp(carte('Stock d’œufs').textContent)).toContain('27 plateaux + 10')
+    expect(esp(carte('Stock d’œufs au magasin').textContent)).toContain('27 plateaux + 10')
   })
 
   it('invite à faire l’inventaire quand le stock n’est pas encore connu', () => {
@@ -88,27 +129,22 @@ describe('Accueil', () => {
     d.transactions!.push(tx({ id: 'dette', date: '2026-09-01', type: 'depense', client_id: 'f-sow', produit_id: 'p-alim', prix_unitaire: 80000, montant_paye: 0 }))
     render(<DonneesFixes donnees={d}><MemoryRouter><Accueil /></MemoryRouter></DonneesFixes>)
     expect(esp(carte('À payer').textContent)).toContain('80 000 F')
-    expect(screen.getAllByRole('status').some((a) => esp(a.textContent).includes('Aliment Sow : 80 000 F à payer depuis 60 jours'))).toBe(true)
   })
 
-  it('signale les saisies en attente d’envoi', () => {
+  it('ne répète pas le bandeau d’attente, déjà affiché en haut de chaque écran', () => {
     afficher(10, 2)
-    expect(screen.getByText('En attente d’envoi (2)')).toBeInTheDocument()
+    expect(screen.queryByText(/En attente d’envoi/)).toBeNull()
   })
 })
 
-describe('Accueil : effectifs à vérifier', () => {
-  it('rappelle de recompter les bandes dont la ponte contredit l’effectif noté', () => {
+describe('Accueil sans alerte', () => {
+  it('encourage quand tout va bien', () => {
     vi.setSystemTime(new Date('2026-10-31T10:00:00'))
     const d = ferme()
-    d.bandes = d.bandes!.map((b) => (b.id === 'b4' ? { ...b, effectif_initial: 100 } : b))
-    d.ponte = [ponte('b4', '2026-10-30', { oeufs_collectes: 520 })]
+    d.bandes = []
+    d.reglages = [{ id: 1, derniere_sauvegarde: '2026-10-30' }]
     render(<DonneesFixes donnees={d}><MemoryRouter><Accueil /></MemoryRouter></DonneesFixes>)
-    expect(screen.getByText(/Effectif à vérifier/)).toHaveTextContent('BANDE 4')
-  })
-
-  it('ne dit rien quand la ponte est cohérente', () => {
-    afficher()
-    expect(screen.queryByText(/Effectif à vérifier/)).toBeNull()
+    expect(screen.getByText('Tout va bien aujourd’hui ✓')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Alertes' }).querySelector('.pastille-nombre')).toBeNull()
   })
 })

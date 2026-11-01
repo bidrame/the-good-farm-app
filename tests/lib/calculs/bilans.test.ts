@@ -42,3 +42,17 @@ describe('classementClients', () => {
     expect(classementClients(txs, clients).map((l) => [l.client.nom, l.ca, l.nb])).toEqual([['Khadija', 600000, 1], ['Sidi', 300000, 1]])
   })
 })
+
+describe('Trésorerie du mois', () => {
+  it('compte l’argent payé, pas le montant des ventes à crédit, plus les paiements du mois', async () => {
+    const { tresorerieMois } = await import('../../../src/lib/calculs/bilans')
+    const t = (id: string, type: 'vente' | 'depense', date: string, montant: number, montant_paye: number) =>
+      ({ id, type, date, client_id: null, produit_id: 'p', quantite: 1, prix_unitaire: montant, montant, montant_paye })
+    const txs = [t('v1', 'vente', '2026-10-05', 100000, 40000), t('d1', 'depense', '2026-10-06', 50000, 0), t('v0', 'vente', '2026-09-30', 9000, 9000)]
+    const paiements = [
+      { id: 'p1', client_id: 'c', date: '2026-10-10', montant: 25000, mode: 'wave' as const },
+      { id: 'p2', client_id: 'f', sens: 'fournisseur' as const, date: '2026-10-12', montant: 30000, mode: 'especes' as const },
+    ]
+    expect(tresorerieMois(txs, paiements, '2026-10')).toEqual({ entre: 65000, sorti: 30000 })
+  })
+})

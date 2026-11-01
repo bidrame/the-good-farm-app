@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react'
-import type { Icon } from '@tabler/icons-react'
+import type { CSSProperties, ReactNode } from 'react'
+import { IconPlus, type Icon } from '@tabler/icons-react'
 import { ICONES, TAILLE, TEINTE, TRAIT, type Genre } from '../icones'
 
 /** Icône dans une pastille de couleur douce (fond clair, icône foncée). Décorative : le texte à côté porte le sens. */
@@ -35,5 +35,15 @@ export function EtatVide({ genre, message, children }: { genre: Genre; message: 
       <p>{message}</p>
       {children}
     </div>
+  )
+}
+
+/** Bouton d'ajout, le même partout : plein, couleur principale, précédé d'un « + ». */
+export function BoutonAjout({ children, onClick, type = 'button', style }: { children: ReactNode; onClick?: () => void; type?: 'button' | 'submit'; style?: CSSProperties }) {
+  return (
+    <button type={type} className="ajout" onClick={onClick} style={style}>
+      <IconPlus size={TAILLE.bouton} stroke={2.5} aria-hidden="true" />
+      {children}
+    </button>
   )
 }

@@ -6,6 +6,7 @@ import { aujourdhui, formatDate, formatFCFA } from '../../lib/format'
 import { FormulairePaiement, MODES } from './ClientFiche'
 import { depuisJours } from './Fournisseurs'
 import { Titre } from '../composants/Pastille'
+import { TelephoneFiche } from '../composants/ChampTelephone'
 
 const NB_HISTORIQUE = 30
 
@@ -28,7 +29,6 @@ export function FournisseurFiche() {
 
   return (
     <main>
-      <Link to="/fournisseurs" className="discret">← Fournisseurs</Link>
       <Titre genre="fournisseur">{f.nom}</Titre>
       <div className="grille2" style={{ marginBottom: 10 }}>
         <div className="metrique">
@@ -41,6 +41,8 @@ export function FournisseurFiche() {
 
       <button onClick={() => setPaiement((p) => !p)} style={{ width: '100%', marginBottom: 8 }}>Enregistrer un paiement</button>
       {paiement && <FormulairePaiement clientId={f.id} sens="fournisseur" soldeActuel={dette.du} onFini={() => setPaiement(false)} />}
+
+      <TelephoneFiche key={f.id} c={f} />
 
       <h2>Historique</h2>
       <div className="carte">

@@ -5,6 +5,7 @@ import { soldeClient } from '../../lib/calculs/credits'
 import { aujourdhui, formatDate, formatFCFA } from '../../lib/format'
 import type { ModePaiement } from '../../lib/types'
 import { lienRappel } from '../../lib/whatsapp'
+import { TelephoneFiche } from '../composants/ChampTelephone'
 import { vibrer } from '../composants/animations'
 import { ChampMontant } from '../composants/communs'
 import { Recapitulatif, Reussite } from '../composants/Recapitulatif'
@@ -62,12 +63,17 @@ export function FormulairePaiement({ clientId, soldeActuel, onFini, sens = 'clie
   return (
     <div className="carte">
       <ChampMontant libelle="Montant" valeur={montant} onChange={(v) => { setMontant(v); setErreur(null) }} erreur={erreur ?? undefined} />
-      <label>
-        Mode
-        <select value={mode} onChange={(e) => setMode(e.target.value as ModePaiement)}>
-          {MODES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-      </label>
+      {soldeActuel > 0 && montant !== soldeActuel && (
+        <button type="button" style={{ width: '100%', marginBottom: 12 }} onClick={() => { setMontant(soldeActuel); setErreur(null) }}>
+          Tout le solde ({formatFCFA(soldeActuel)})
+        </button>
+      )}
+      <label id="mode-paiement">Mode</label>
+      <div className="puces" role="group" aria-labelledby="mode-paiement" style={{ marginBottom: 12 }}>
+        {MODES.map(([v, l]) => (
+          <button key={v} type="button" className={mode === v ? 'choisi' : ''} aria-pressed={mode === v} onClick={() => setMode(v)}>{l}</button>
+        ))}
+      </div>
       <label>Date<input type="date" value={date} max={aujourdhui()} onChange={(e) => setDate(e.target.value)} /></label>
       <button className="principal" onClick={() => {
         if (!montant || montant <= 0) return setErreur('Montant obligatoire')
@@ -79,7 +85,7 @@ export function FormulairePaiement({ clientId, soldeActuel, onFini, sens = 'clie
 
 export function ClientFiche() {
   const { id } = useParams()
-  const { clients, transactions, paiements, produits, enregistrer } = useDonnees()
+  const { clients, transactions, paiements, produits } = useDonnees()
   const [paiement, setPaiement] = useState(false)
   const c = clients.find((x) => x.id === id)
   if (!c) return <main><p>Client introuvable.</p><Link to="/clients">Retour</Link></main>
@@ -95,7 +101,6 @@ export function ClientFiche() {
 
   return (
     <main>
-      <Link to="/clients" className="discret">← Clients</Link>
       <Titre genre="client">{c.nom}</Titre>
       <div className="grille2" style={{ marginBottom: 10 }}>
         <div className="metrique"><div className="discret">Solde</div><div className={`valeur ${solde > 0 ? 'mauvais' : 'ok'}`} data-testid="solde">{solde >= 0 ? formatFCFA(solde) : `Avance ${formatFCFA(-solde)}`}</div></div>
@@ -110,10 +115,7 @@ export function ClientFiche() {
         </a>
       )}
 
-      <label>
-        Téléphone
-        <input inputMode="tel" defaultValue={c.telephone ?? ''} onBlur={(e) => e.target.value !== (c.telephone ?? '') && enregistrer('clients', { ...c, telephone: e.target.value.trim() || null })} />
-      </label>
+      <TelephoneFiche key={c.id} c={c} />
 
       <h2>Historique</h2>
       <div className="carte">

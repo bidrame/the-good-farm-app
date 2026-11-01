@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Bande } from '../../lib/types'
 import { ChampMontant } from '../composants/communs'
+import { useAnnuler } from '../composants/Annuler'
 import { Link, useParams } from 'react-router-dom'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useDonnees } from '../../data/useDonnees'
@@ -118,7 +119,8 @@ function AvisEffectif({ b, onRecompter }: { b: Bande; onRecompter: () => void })
 
 export function BandeFiche() {
   const { id } = useParams()
-  const { bandes, ponte, recensements, mortalites, ouvriers, reglages, enregistrer, supprimer } = useDonnees()
+  const { bandes, ponte, recensements, mortalites, ouvriers, reglages, enregistrer, supprimer, restaurer } = useDonnees()
+  const [bandeauAnnuler, proposerAnnuler] = useAnnuler()
   const [recompte, setRecompte] = useState(false)
   const [morts, setMorts] = useState(false)
   const [reforme, setReforme] = useState(false)
@@ -156,7 +158,6 @@ export function BandeFiche() {
 
   return (
     <main>
-      <Link to="/bandes" className="discret">← Bandes</Link>
       <h1 className="titre"><span className="pastille" style={{ background: teinteBande(b) }} aria-hidden="true" />{b.nom}</h1>
       <AvisEffectif b={b} onRecompter={() => setRecompte(true)} />
       <div className="carte">
@@ -191,7 +192,10 @@ export function BandeFiche() {
           {sesMorts.map((m) => (
             <div className="ligne" key={m.id}>
               <span><span className="discret">{formatDate(m.date)}</span> {m.nombre} mort{m.nombre > 1 ? 's' : ''}{m.observation ? <span className="discret"> · {m.observation}</span> : null}</span>
-              <button className="lien" aria-label={`Supprimer les morts du ${formatDate(m.date)}`} onClick={() => supprimer('mortalites', m.id)}>Supprimer</button>
+              <button className="lien" aria-label={`Supprimer les morts du ${formatDate(m.date)}`} onClick={() => {
+                supprimer('mortalites', m.id)
+                proposerAnnuler(`${m.nombre} mort${m.nombre > 1 ? 's' : ''} du ${formatDate(m.date)} supprimé${m.nombre > 1 ? 's' : ''}`, () => restaurer('mortalites', m.id))
+              }}>Supprimer</button>
             </div>
           ))}
         </section>
@@ -225,6 +229,7 @@ export function BandeFiche() {
           </div>
         </div>
       )}
+      {bandeauAnnuler}
     </main>
   )
 }

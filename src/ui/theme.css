@@ -4,6 +4,8 @@
   --vert-vif: #4c8a1e;
   --vert-clair: #edf2e3;
   --sur-vert: #ffffff;
+  /* Texte d'accent sur le bandeau vert. */
+  --accent-vedette: #ffd34d;
   --jaune: #f2b705;
   --jaune-clair: #fff4d1;
   --sur-jaune: #5a3c00;
@@ -13,11 +15,15 @@
   --carte: #ffffff;
   --champ: #fbfaf5;
   --bord: #e4e1d3;
+  /* Bord des champs et boutons : visible au soleil (≥ 3:1 sur le fond du champ). */
+  --bord-champ: #8a8775;
   --ok: #2f6b12;
   --attention: #7a5200;
   --attention-fond: #fff4d1;
   --danger: #b3261e;
   --danger-fond: #fdecea;
+  /* Bandeau du résultat quand le mois est en perte. */
+  --perte: #b3261e; --sur-perte: #ffffff; --accent-perte: #ffe9a8;
   /* Teintes des pastilles : fond doux + icône foncée (contraste ≥ 4.5:1) */
   --t-vert-fond: #e3f0d6; --t-vert: #2f6b12;
   --t-rouge-fond: #fbe4df; --t-rouge: #a3321f;
@@ -39,6 +45,7 @@
     --vert-vif: #a6d978;
     --vert-clair: #22331a;
     --sur-vert: #10200a;
+    --accent-vedette: #5a3c00;
     --jaune: #ffd54a;
     --jaune-clair: #3a2e0a;
     --sur-jaune: #ffe9a8;
@@ -48,11 +55,13 @@
     --carte: #1a2414;
     --champ: #151e10;
     --bord: #2c3a24;
+    --bord-champ: #6b7a5e;
     --ok: #a6d978;
     --attention: #ffd54a;
     --attention-fond: #3a2e0a;
     --danger: #ff9c94;
     --danger-fond: #3d1714;
+    --perte: #ff9c94; --sur-perte: #3d1714; --accent-perte: #5a3c00;
     --t-vert-fond: #24381a; --t-vert: #a6d978;
     --t-rouge-fond: #3d1a16; --t-rouge: #ff9c94;
     --t-ambre-fond: #3a2e0a; --t-ambre: #ffd54a;
@@ -74,14 +83,14 @@ a { color: var(--vert); }
 .carte { background: var(--carte); border: 1px solid var(--bord); border-radius: var(--rayon-carte); padding: 14px; margin-bottom: 12px; box-shadow: var(--ombre); }
 .grille2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .grille3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; align-items: end; }
-.discret { color: var(--texte-2); font-size: 13px; }
+.discret { color: var(--texte-2); font-size: 14px; }
 .ligne { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; }
 .ligne + .ligne { border-top: 1px solid var(--bord); }
 
-label { display: block; font-size: 13px; font-weight: 600; color: var(--texte-2); margin-bottom: 10px; }
+label { display: block; font-size: 15px; font-weight: 600; color: var(--texte-2); margin-bottom: 10px; }
 input, select, textarea {
   display: block; width: 100%; margin-top: 5px; min-height: 48px; padding: 10px 12px; font: inherit; font-size: 17px; font-weight: 600;
-  border: 1.5px solid var(--bord); border-radius: var(--rayon); background: var(--champ); color: var(--texte);
+  border: 1.5px solid var(--bord-champ); border-radius: var(--rayon); background: var(--champ); color: var(--texte);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--vert-vif); box-shadow: 0 0 0 3px var(--vert-clair); }
@@ -89,18 +98,21 @@ input[aria-invalid='true'] { border-color: var(--danger); }
 
 button {
   min-height: 48px; padding: 10px 14px; font: inherit; font-size: 15px; font-weight: 700; border-radius: var(--rayon);
-  border: 1.5px solid var(--bord); background: var(--carte); color: var(--texte); cursor: pointer;
+  border: 1.5px solid var(--bord-champ); background: var(--carte); color: var(--texte); cursor: pointer;
   transition: transform 0.08s, background-color 0.15s, border-color 0.15s;
 }
 button:active { transform: scale(0.97); }
 button:disabled { opacity: 0.6; }
 button.principal { background: var(--vert); border-color: var(--vert); color: var(--sur-vert); width: 100%; font-size: 17px; min-height: 54px; }
-button.choisi { border-color: var(--vert); background: var(--vert-clair); color: var(--vert); }
-button.lien { border: none; background: none; color: var(--vert); padding: 0; min-height: auto; text-decoration: underline; font-weight: 700; }
+button.principal:disabled { background: var(--bord); border-color: var(--bord); color: var(--texte-2); opacity: 1; }
+button.choisi { border-color: var(--vert); background: var(--vert); color: var(--sur-vert); }
+/* Boutons-liens : discrets mais faciles à toucher (44 px de haut). */
+button.lien { border: none; background: none; color: var(--vert); padding: 0 6px; min-height: 44px; text-decoration: underline; font-weight: 700; }
+a.retour { display: inline-flex; align-items: center; min-height: 44px; padding-right: 16px; font-size: 16px; font-weight: 700; color: var(--vert); text-decoration: none; }
 .puces { display: flex; flex-wrap: wrap; gap: 8px; }
-.puces button { min-height: 40px; padding: 6px 12px; font-size: 14px; border-radius: 999px; }
+.puces button { min-height: 44px; padding: 6px 12px; font-size: 14px; border-radius: 999px; }
 
-.erreur { color: var(--danger); font-size: 13px; font-weight: 600; margin-top: 4px; }
+.erreur { color: var(--danger); font-size: 15px; font-weight: 600; margin-top: 4px; }
 .alerte { display: flex; gap: 8px; align-items: flex-start; border-radius: var(--rayon); padding: 10px 12px; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
 .alerte svg { flex: none; margin-top: 1px; }
 .alerte.danger { background: var(--danger-fond); color: var(--danger); }
@@ -113,7 +125,14 @@ button.lien { border: none; background: none; color: var(--vert); padding: 0; mi
 .vedette { background: var(--vert); color: var(--sur-vert); border-radius: 22px; padding: 16px; margin-bottom: 12px; box-shadow: var(--ombre); }
 .vedette .discret { color: inherit; opacity: 0.85; }
 .vedette .grand { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; }
-.vedette .variation { color: var(--jaune); font-weight: 700; font-size: 13px; }
+.vedette-camion { display: flex; align-items: center; justify-content: space-between; gap: 8px; overflow: hidden; }
+.vedette-camion .camionnette { flex-shrink: 0; margin-right: -6px; animation: arrivee-camion 0.9s ease-out both; }
+@keyframes arrivee-camion { from { transform: translateX(120%); } to { transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) { .vedette-camion .camionnette { animation: none; } }
+.tresorerie { margin: -4px 4px 12px; font-size: 14px; line-height: 1.5; color: var(--texte-2); }
+.vedette .variation { color: var(--accent-vedette); font-weight: 700; font-size: 14px; }
+.vedette.vedette-perte { background: var(--perte); color: var(--sur-perte); }
+.vedette.vedette-perte .variation { color: var(--accent-perte); }
 
 .raccourcis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
 .raccourcis a { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 4px; border-radius: var(--rayon-carte); font-weight: 800; font-size: 14px; text-decoration: none; box-shadow: var(--ombre); }
@@ -128,7 +147,7 @@ nav.barre {
   position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-around; z-index: 5;
   background: var(--carte); border-top: 1px solid var(--bord); padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
 }
-nav.barre a { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--texte-2); text-decoration: none; font-size: 11px; font-weight: 700; padding: 4px 0; border-radius: 14px; }
+nav.barre a { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--texte-2); text-decoration: none; font-size: 12px; font-weight: 700; padding: 4px 0; border-radius: 14px; }
 nav.barre a .icone { display: flex; align-items: center; justify-content: center; width: 52px; height: 30px; border-radius: 99px; transition: background-color 0.2s; }
 nav.barre a.active { color: var(--vert); }
 nav.barre a.active .icone { background: var(--vert-clair); }
@@ -136,7 +155,7 @@ nav.barre a.active .icone { background: var(--vert-clair); }
 .voile { background: rgba(0, 0, 0, 0.45); position: fixed; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding: 16px; z-index: 10; animation: fondu 0.15s ease-out; }
 .voile .carte { max-width: 480px; width: 100%; animation: monte 0.22s ease-out; }
 
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 7px 4px; border-bottom: 1px solid var(--bord); }
 th { color: var(--texte-2); font-weight: 700; }
 td:first-child { white-space: nowrap; }
@@ -171,7 +190,7 @@ a.carte.lien-carte { display: flex; align-items: center; gap: 12px; color: inher
 a.carte.lien-carte:active, a.metrique:active, a.ligne:active { transform: scale(0.985); }
 a.carte.lien-carte .chevron { margin-left: auto; color: var(--texte-2); }
 button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
-button.lien { display: inline; }
+button.lien { display: inline-flex; }
 button.principal:active { background: var(--vert-vif); border-color: var(--vert-vif); }
 a.metrique, a.ligne, a.carte { transition: transform 0.08s; }
 .point-bande { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
@@ -187,3 +206,94 @@ a.metrique, a.ligne, a.carte { transition: transform 0.08s; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .coche path { stroke-dashoffset: 0; }
 }
+
+/* Réglages : rubriques, phrases d'alerte, réglettes − / + */
+.rubrique h3 { font-size: 15px; margin: 16px 0 6px; }
+.sous-rubrique { border-top: 1px solid var(--bord); margin-top: 14px; padding-top: 2px; }
+.phrases-alerte p { margin: 0 0 14px; line-height: 2.4; }
+.phrases-alerte .exemple { display: block; line-height: 1.4; font-size: 13px; }
+.reglette { display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; }
+.reglette button { min-height: 44px; min-width: 44px; padding: 0; border-radius: 99px; display: inline-flex; align-items: center; justify-content: center; }
+.reglette input { width: 3.4em; min-height: 44px; margin: 0; padding: 0 4px; text-align: center; font-weight: 800; font-size: 17px; }
+label.case { display: flex; gap: 10px; align-items: flex-start; margin: 4px 0 12px; }
+label.case input { width: 26px; height: 26px; min-height: 0; padding: 0; margin: 0; flex-shrink: 0; border: none; accent-color: var(--vert); }
+label.case { align-items: center; color: var(--texte); font-size: 15px; }
+details.avance { border-top: 1px solid var(--bord); margin-top: 14px; padding-top: 10px; }
+details.avance summary { cursor: pointer; font-weight: 700; color: var(--texte-2); }
+a.bouton-lien { display: block; text-align: center; padding: 12px; border-radius: 14px; background: var(--vert); color: var(--sur-vert); font-weight: 800; text-decoration: none; margin-top: 8px; }
+
+/* Alertes : cloche de l'accueil, bandeau unique, page Alertes */
+.cloche { margin-left: auto; position: relative; display: inline-flex; align-items: center; justify-content: center; width: 46px; height: 46px; border-radius: 99px; background: var(--carte); color: var(--texte); box-shadow: var(--ombre); }
+.pastille-nombre { position: absolute; top: -2px; right: -2px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 99px; font-size: 12px; font-weight: 800; line-height: 20px; text-align: center; color: var(--carte); }
+.pastille-nombre.danger { background: var(--danger); }
+.pastille-nombre.attention { background: var(--attention); }
+.bandeau-alerte { display: flex; align-items: stretch; gap: 6px; margin-bottom: 8px; }
+.bandeau-alerte a { flex: 1; text-decoration: none; }
+.bandeau-alerte .alerte { margin-bottom: 0; height: 100%; }
+button.vu-bandeau { min-width: 52px; padding: 0 10px; border-radius: var(--rayon); font-weight: 800; border: none; }
+button.vu-bandeau.danger { background: var(--danger-fond); color: var(--danger); }
+button.vu-bandeau.attention { background: var(--attention-fond); color: var(--attention); }
+button.vu-bandeau.info { background: var(--vert-clair); color: var(--ok); }
+.carte-alerte .alerte { margin-bottom: 8px; }
+.carte-alerte.vue { opacity: 0.85; }
+.carte-alerte.vue .alerte { background: var(--fond); color: var(--texte-2); }
+.actions-alerte { display: flex; gap: 8px; align-items: center; }
+.actions-alerte .bouton-lien { flex: 1; margin-top: 0; padding: 10px; }
+
+/* Boutons d'ajout : pleins, couleur principale, avec « + » */
+button.ajout { display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: var(--vert); border-color: var(--vert); color: var(--sur-vert); font-weight: 800; }
+
+/* Prix de revient et aliment */
+details.mois-cout summary { list-style: none; cursor: pointer; }
+details.mois-cout summary::-webkit-details-marker { display: none; }
+.vedette.vedette-alerte { background: var(--attention); }
+
+/* Répartition du chargement entre les clients */
+.compteur-reste { position: sticky; top: 8px; z-index: 2; display: flex; flex-direction: column; align-items: center; padding: 10px; margin-bottom: 10px;
+  border-radius: var(--rayon); background: var(--jaune-clair); color: var(--texte); box-shadow: var(--ombre); }
+.compteur-reste strong { font-size: 26px; }
+.compteur-reste.ok { background: var(--vert-clair); color: var(--ok); }
+.compteur-reste.trop { background: var(--danger-fond); color: var(--danger); }
+fieldset.ligne-repartition { border: none; border-top: 1px solid var(--bord); padding: 10px 0 4px; margin: 0; }
+.choix-paiement { margin-bottom: 8px; }
+.choix-paiement button { min-height: 48px; padding: 0 4px; font-size: 14px; }
+
+/* Calibres : Gros / Moyen / Petit */
+.box-reglage + .box-reglage { border-top: 1px solid var(--bord); }
+.choix-calibre { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 2px 0 10px; }
+.choix-calibre button { min-height: 48px; padding: 0 4px; font-size: 14px; }
+.pastille-calibre { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; font-weight: 800; background: var(--vert-clair); color: var(--vert); }
+.pastille-calibre.autre { background: var(--fond); color: var(--texte-2); }
+.calibres-ligne { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.calibres-vedette { margin-top: 8px; font-weight: 800; }
+.calibres-vedette .pastille-calibre { background: rgba(255,255,255,0.18); color: inherit; }
+.restes-calibres { display: flex; gap: 14px; margin-top: 6px; font-size: 14px; }
+.restes-calibres strong { font-size: 16px; }
+.choix-calibre.a-choisir button { border-color: var(--attention); }
+.choix-calibre button:disabled { opacity: 0.5; }
+
+/* Aliment de la ponte : − 1 sac / champ / + 1 sac */
+.champ-aliment { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: end; }
+.champ-aliment > button { min-height: 48px; margin-bottom: 10px; padding: 0 10px; font-size: 14px; white-space: nowrap; }
+.repris { font-style: italic; }
+
+/* Ponte : hier et aujourd'hui côte à côte */
+.hier-auj { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; padding: 8px 10px; margin: 4px 0 8px;
+  border-radius: var(--rayon); background: var(--fond); font-size: 14px; }
+.stock-calibres { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 6px; font-size: 14px; font-weight: 800; }
+.stock-accueil { display: block; margin-bottom: 12px; }
+.stock-accueil .metrique .valeur { font-size: 26px; }
+.matin-boxes { border-left: 3px solid var(--jaune); padding-left: 10px; margin-bottom: 8px; }
+
+/* Saisies en attente d'envoi : toujours visible en haut, même en faisant défiler. */
+.bandeau-fixe { position: sticky; top: 0; z-index: 6; }
+
+/* Retour commun des pages rangées dans « Plus » et des fiches. */
+.entete-retour { max-width: 560px; margin: 0 auto; padding: 6px 16px 0; }
+.entete-retour + main { padding-top: 0; }
+
+/* « Annuler » après une suppression, au-dessus de la barre du bas. */
+.toast-annuler { position: fixed; left: 16px; right: 16px; bottom: calc(80px + env(safe-area-inset-bottom)); max-width: 528px; margin: 0 auto; z-index: 8;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 6px 6px 14px;
+  border-radius: var(--rayon); background: var(--texte); color: var(--fond); font-weight: 700; box-shadow: var(--ombre); animation: monte 0.2s ease-out; }
+.toast-annuler button { background: transparent; color: var(--fond); border-color: var(--fond); }

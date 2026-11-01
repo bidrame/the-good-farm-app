@@ -1,25 +1,31 @@
 import {
-  IconAlertTriangle, IconCash, IconChartBar, IconCirclePlus, IconCoins, IconDots, IconEgg, IconFeather, IconFileInvoice,
-  IconFileSpreadsheet, IconHistory, IconHome, IconHourglass, IconReceipt, IconSettings, IconStack2, IconTrash, IconTruck, IconUser,
+  IconAlertTriangle, IconBuildingWarehouse, IconCalculator, IconCash, IconChartBar, IconCirclePlus, IconCoins, IconDots, IconEgg, IconFileInvoice,
+  IconFileSpreadsheet, IconHistory, IconHome, IconHourglass, IconPackage, IconReceipt, IconSettings, IconStack2, IconTrash, IconTruckDelivery, IconUser, IconUserCircle, IconUsers,
   type Icon,
 } from '@tabler/icons-react'
+import { IconePoules } from './composants/IconePoules'
 
 /** Une icône et une couleur par type de chose, les mêmes dans toute l’appli. */
 export type Genre =
   | 'vente' | 'depense' | 'ponte' | 'bande' | 'client' | 'fournisseur' | 'paiement' | 'credit' | 'aPayer' | 'stock'
-  | 'alerte' | 'reglages' | 'export' | 'corbeille' | 'historique' | 'rapports'
+  | 'ramassage' | 'aliment' | 'couts' | 'ouvrier' | 'compte' | 'alerte' | 'reglages' | 'export' | 'corbeille' | 'historique' | 'rapports'
 
 export const ICONES: Record<Genre, Icon> = {
   vente: IconCash,
   depense: IconReceipt,
   ponte: IconEgg,
-  bande: IconFeather,
+  bande: IconePoules,
   client: IconUser,
-  fournisseur: IconTruck,
+  fournisseur: IconBuildingWarehouse,
   paiement: IconCoins,
   credit: IconHourglass,
   aPayer: IconFileInvoice,
   stock: IconStack2,
+  ramassage: IconTruckDelivery,
+  aliment: IconPackage,
+  couts: IconCalculator,
+  ouvrier: IconUsers,
+  compte: IconUserCircle,
   alerte: IconAlertTriangle,
   reglages: IconSettings,
   export: IconFileSpreadsheet,
@@ -35,6 +41,11 @@ export const TEINTE: Record<Genre, 'vert' | 'rouge' | 'ambre' | 'terre' | 'bleu'
   depense: 'rouge',
   ponte: 'ambre',
   stock: 'ambre',
+  ramassage: 'ambre',
+  aliment: 'terre',
+  couts: 'vert',
+  ouvrier: 'terre',
+  compte: 'neutre',
   credit: 'ambre',
   aPayer: 'ambre',
   alerte: 'ambre',

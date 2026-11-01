@@ -122,6 +122,27 @@ describe('Saisir une vente', () => {
     expect(enregistrer).toHaveBeenCalledWith('clients', expect.objectContaining({ nom: 'Maguette' }))
   })
 
+  it('propose le client existant pour un nom proche et demande confirmation avant d’ajouter', async () => {
+    const { u, enregistrer } = afficher()
+    await u.type(screen.getByLabelText('Client'), 'Babakar')
+    expect(screen.getByRole('button', { name: 'Babacar' })).toBeInTheDocument()
+    await u.click(screen.getByRole('button', { name: 'Ajouter « Babakar »' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('« Babakar » ressemble à Babacar')
+    expect(enregistrer).not.toHaveBeenCalled()
+    await u.click(screen.getByRole('button', { name: 'C’est une autre personne' }))
+    expect(enregistrer).toHaveBeenCalledWith('clients', expect.objectContaining({ nom: 'Babakar' }))
+  })
+
+  it('note le calibre d’une vente d’œufs', async () => {
+    const { u, enregistrer } = afficher()
+    await venteOeufs(u)
+    await u.click(within(screen.getByRole('group', { name: 'Calibre' })).getByRole('button', { name: 'Petit' }))
+    await continuer(u)
+    expect(screen.getByRole('region', { name: 'Récapitulatif' })).toHaveTextContent('CalibrePetit')
+    await valider(u)
+    expect(enregistrer).toHaveBeenCalledWith('transactions', expect.objectContaining({ calibre: 'petit' }))
+  })
+
   it('demande confirmation pour une vente déjà saisie', async () => {
     const d = ferme()
     d.transactions!.push({ ...d.transactions![1], id: 'jour', date: new Date().toLocaleDateString('sv-SE'), quantite: 20, montant: 52000 })
@@ -229,5 +250,39 @@ describe('Saisir : robustesse', () => {
     const { u } = afficher()
     await u.type(screen.getByLabelText('Quantité'), '2,5')
     expect(screen.getByText('Nombre entier attendu')).toBeInTheDocument()
+  })
+})
+
+describe('Après validation', () => {
+  it('repart d’un formulaire vide si on quitte l’écran sans toucher « Nouvelle saisie »', async () => {
+    const { u, enregistrer } = afficher()
+    await venteOeufs(u)
+    await continuer(u)
+    await valider(u)
+    const premiere = enregistrer.mock.calls[0][1].id
+    cleanup()
+
+    const suite = afficher({}, ferme(), '/saisir?type=depense')
+    expect(screen.getByRole('button', { name: 'Dépense' })).toHaveClass('choisi')
+    expect(screen.getByLabelText('Quantité')).toHaveValue('')
+    await suite.u.click(screen.getByRole('button', { name: 'Aliment pondeuse' }))
+    await suite.u.type(screen.getByLabelText('Quantité'), '3')
+    await suite.u.type(screen.getByLabelText(/Prix/), '15000')
+    await continuer(suite.u)
+    await valider(suite.u)
+    expect(suite.enregistrer.mock.calls[0][1].id).not.toBe(premiere)
+  })
+})
+
+describe('Sans réseau', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('dit que la saisie est gardée sur le téléphone', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    const { u } = afficher()
+    await venteOeufs(u)
+    await continuer(u)
+    await valider(u)
+    expect(screen.getByRole('status')).toHaveTextContent(/gardée sur le téléphone/)
   })
 })
