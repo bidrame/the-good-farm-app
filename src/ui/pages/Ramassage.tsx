@@ -42,25 +42,24 @@ function LigneCalibres({ quantites, enOeufs = true }: { quantites: Partial<Recor
 
 /**
  * Chargement global au magasin, calibre par calibre : le prévu (déjà rempli), plus éventuellement
- * le ramassage du matin même, noté box par box : son calibre est celui du box.
+ * le ramassage du matin même, noté plus haut box par box (en plateaux, au calibre du box).
  */
-function Chargement({ prevus, boxesMatin, du, au, depuisStock = false, onFini }: {
-  prevus: Partial<Record<CleCalibre, number>>; boxesMatin: { numero: number; calibre: Calibre | null }[]
+function Chargement({ prevus, matinParCalibre, du, au, depuisStock = false, onFini }: {
+  prevus: Partial<Record<CleCalibre, number>>; matinParCalibre: Partial<Record<CleCalibre, number>>
   du: DateISO; au: DateISO; depuisStock?: boolean; onFini: (id: string) => void
 }) {
   const { enregistrer } = useDonnees()
   const cles = ORDRE_CLES.filter((k) => (prevus[k] ?? 0) > 0)
   const [plateaux, setPlateaux] = useState<Partial<Record<CleCalibre, number | null>>>(() =>
     Object.fromEntries(cles.map((k) => [k, Math.round((prevus[k] ?? 0) / OEUFS_PAR_PLATEAU)])))
-  const [apresMatin, setApresMatin] = useState(false)
-  const [matin, setMatin] = useState<Record<number, number | null>>({})
   const [observation, setObservation] = useState('')
   const [enCours, setEnCours] = useState(false)
-  const matinParCalibre = apresMatin ? parCalibre(boxesMatin, (b) => b.calibre, (b) => matin[b.numero] ?? 0) : {}
   const totalMatin = ORDRE_CLES.reduce((s, k) => s + (matinParCalibre[k] ?? 0), 0)
   // Un calibre peut n'arriver que par le matin (rien au magasin) : il a quand même sa ligne.
   const clesChargees = ORDRE_CLES.filter((k) => cles.includes(k) || (matinParCalibre[k] ?? 0) > 0)
   const prevu = cles.reduce((s, k) => s + (prevus[k] ?? 0), 0)
+  // L'écart se mesure sur le prévu tel que prérempli (arrondi calibre par calibre) : sinon les arrondis créent un faux écart.
+  const prevuArrondi = cles.reduce((s, k) => s + Math.round((prevus[k] ?? 0) / OEUFS_PAR_PLATEAU), 0) * OEUFS_PAR_PLATEAU
   const charges = cles.reduce((s, k) => s + (plateaux[k] ?? 0), 0)
   const total = charges + totalMatin
   const complet = cles.every((k) => plateaux[k] != null)
@@ -91,29 +90,15 @@ function Chargement({ prevus, boxesMatin, du, au, depuisStock = false, onFini }:
             valeur={plateaux[k] ?? null} onChange={(n) => setPlateaux((p) => ({ ...p, [k]: n }))} />
         ))}
       </div>
-      {complet && (
+      {complet && cles.length > 0 && (
         <div style={{ fontSize: 13, fontWeight: 700, margin: '-4px 0 10px' }}>
-          Prévu {enPlateaux(prevu)} · <Ecart theorique={prevu} charge={charges * OEUFS_PAR_PLATEAU} />
+          Prévu {enPlateaux(prevu)} · <Ecart theorique={prevuArrondi} charge={charges * OEUFS_PAR_PLATEAU} />
         </div>
       )}
-      <label className="case">
-        <input type="checkbox" checked={apresMatin} onChange={(e) => setApresMatin(e.target.checked)} />
-        <span>Le bus part après le ramassage du matin</span>
-      </label>
-      {apresMatin && (
-        <>
-          <div className="matin-boxes" role="group" aria-label="Ramassés ce matin">
-            <p className="discret" style={{ margin: '0 0 6px' }}>+ Ramassés ce matin, box par box (laissez vide un box non ramassé)</p>
-            <div className="grille2">
-              {boxesMatin.map((b) => (
-                <ChampMontant key={b.numero} libelle={`Box ${b.numero} · ${nomCle(cle(b.calibre))}`}
-                  valeur={matin[b.numero] ?? null} onChange={(n) => setMatin((m) => ({ ...m, [b.numero]: n }))} />
-              ))}
-            </div>
-            {totalMatin > 0 && <div style={{ fontWeight: 700 }}>Total du matin : <LigneCalibres quantites={matinParCalibre} enOeufs={false} /></div>}
-          </div>
-          <p className="discret">La ponte de ce soir les comptera, mais leur vente les aura déjà retirés du stock : rien n’est compté deux fois.</p>
-        </>
+      {totalMatin > 0 && (
+        <div className="ligne">
+          <span>+ Ramassés ce matin</span><LigneCalibres quantites={matinParCalibre} enOeufs={false} />
+        </div>
       )}
       <div className="ligne" style={{ borderTop: '1px solid var(--bord)', marginBottom: 8 }}>
         <span>Total chargé</span><strong>{total} plateau{total > 1 ? 'x' : ''}</strong>
@@ -121,6 +106,42 @@ function Chargement({ prevus, boxesMatin, du, au, depuisStock = false, onFini }:
       <label>Observation<input value={observation} onChange={(e) => setObservation(e.target.value)} placeholder="casse pendant le transport, chauffeur…" /></label>
       <button type="submit" className="principal" disabled={!complet || enCours} style={{ width: '100%' }}>Continuer vers la répartition</button>
     </form>
+  )
+}
+
+/**
+ * Posée dès que la livraison est pour aujourd'hui : le bus emporte-t-il aussi le ramassage de ce matin ?
+ * Si oui, les plateaux se notent box par box ; leur calibre est celui du box.
+ */
+function QuestionMatin({ reponse, onReponse, boxes, matin, onMatin }: {
+  reponse: boolean | null; onReponse: (r: boolean) => void
+  boxes: { numero: number; calibre: Calibre | null; parJour: number }[]
+  matin: Record<number, number | null>; onMatin: (numero: number, n: number | null) => void
+}) {
+  const parCal = parCalibre(boxes, (b) => b.calibre, (b) => matin[b.numero] ?? 0)
+  return (
+    <section className="carte" aria-label="Ramassage du matin">
+      <strong id="question-matin">Le ramassage de ce matin part-il dans le bus ?</strong>
+      <div className="grille2" role="group" aria-labelledby="question-matin" style={{ margin: '8px 0 0' }}>
+        {([[true, 'Oui'], [false, 'Non']] as const).map(([v, l]) => (
+          <button key={l} type="button" className={reponse === v ? 'choisi' : ''} aria-pressed={reponse === v} onClick={() => onReponse(v)}>{l}</button>
+        ))}
+      </div>
+      {reponse && (
+        <div className="matin-boxes" role="group" aria-label="Ramassés ce matin" style={{ marginTop: 12 }}>
+          <p className="discret" style={{ margin: '0 0 6px' }}>Plateaux ramassés ce matin, box par box (laissez vide un box non ramassé)</p>
+          <div className="grille2">
+            {boxes.map((b) => (
+              <ChampMontant key={b.numero} libelle={`Box ${b.numero} · ${nomCle(cle(b.calibre))}`}
+                suffixe={b.parJour ? `plateaux (≈ ${b.parJour}/jour)` : 'plateaux'}
+                valeur={matin[b.numero] ?? null} onChange={(n) => onMatin(b.numero, n)} />
+            ))}
+          </div>
+          {ORDRE_CLES.some((k) => parCal[k]) && <div style={{ fontWeight: 700 }}>Total du matin : <LigneCalibres quantites={parCal} enOeufs={false} /></div>}
+          <p className="discret" style={{ marginBottom: 0 }}>La ponte de ce soir les comptera, mais leur vente les aura déjà retirés du stock : rien n’est compté deux fois.</p>
+        </div>
+      )}
+    </section>
   )
 }
 
@@ -188,6 +209,8 @@ export function Ramassage() {
   const [du, setDu] = useState(() => debutPeriode(ramassages, auj, ponte))
   const [chargement, setChargement] = useState(false)
   const [aRepartir, setARepartir] = useState<string | null>(null)
+  const [apresMatin, setApresMatin] = useState<boolean | null>(null)
+  const [matin, setMatin] = useState<Record<number, number | null>>({})
   const fin = finPonte(jour)
   const inv = inventaireTheorique({ bandes, pontes: ponte, boxes: boxesFerme(reglages[0], bandes) }, du, fin, auj)
   const emportes = dejaEmportes(ramassages, du)
@@ -214,16 +237,42 @@ export function Ramassage() {
   const debutFutur = ponte.some((p) => p.date === auj && !p.supprime_le) ? ajouterJours(auj, 1) : auj
   const futur = depart && jour > auj ? aRamasserParCalibre(inventaireTheorique({ bandes, pontes: ponte, boxes }, debutFutur, finPonte(jour), auj), {}) : {}
 
-  // Box qui ont une bande en place : ce sont eux qu'on peut ramasser le matin.
+  // Box qui ont une bande en place : ce sont eux qu'on peut ramasser le matin, avec leur ponte habituelle en repère.
+  const debutMoyenne = ajouterJours(auj, -7)
   const boxesMatin = boxes
-    .filter((x) => bandes.some((b) => !b.supprime_le && !b.date_reforme && b.box === x.numero))
-    .map((x) => ({ numero: x.numero, calibre: x.calibre ?? null }))
+    .map((x) => ({ x, ids: bandes.filter((b) => !b.supprime_le && !b.date_reforme && b.box === x.numero).map((b) => b.id) }))
+    .filter(({ ids }) => ids.length > 0)
+    .map(({ x, ids }) => {
+      const recentes = ponte.filter((p) => !p.supprime_le && ids.includes(p.bande_id) && p.date >= debutMoyenne && p.date < auj)
+      const nbJours = new Set(recentes.map((p) => p.date)).size
+      const bonsTotal = recentes.reduce((s, p) => s + p.oeufs_collectes - p.oeufs_perdus, 0)
+      return { numero: x.numero, calibre: x.calibre ?? null, parJour: nbJours ? Math.round(bonsTotal / nbJours / OEUFS_PAR_PLATEAU) : 0 }
+    })
+  // La question du matin n'a de sens que pour un départ aujourd'hui. Avec le stock suivi, une ponte du jour déjà saisie
+  // compte déjà ces œufs au magasin : les noter en plus les compterait deux fois.
+  const ponteDuJourSaisie = ponte.some((p) => p.date === auj && !p.supprime_le)
+  const questionMatin = au === auj && (!depart || !ponteDuJourSaisie)
+  // Plateaux ramassés ce matin, par calibre (comptés seulement si la question est posée et la réponse oui).
+  const matinParCalibre = questionMatin && apresMatin ? parCalibre(boxesMatin, (b) => b.calibre, (b) => matin[b.numero] ?? 0) : {}
+  const totalMatinPlateaux = ORDRE_CLES.reduce((s, k) => s + (matinParCalibre[k] ?? 0), 0)
+  const enOeufsAvecMatin = (q: Partial<Record<CleCalibre, number>>) => {
+    const r: Partial<Record<CleCalibre, number>> = {}
+    for (const k of ORDRE_CLES) {
+      const n = (q[k] ?? 0) + (matinParCalibre[k] ?? 0) * OEUFS_PAR_PLATEAU
+      if (n > 0) r[k] = n
+    }
+    return r
+  }
+  const question = questionMatin && (
+    <QuestionMatin reponse={apresMatin} onReponse={setApresMatin} boxes={boxesMatin} matin={matin}
+      onMatin={(numero, n) => setMatin((m) => ({ ...m, [numero]: n }))} />
+  )
 
   /** Encadré « Charger le bus et répartir » : le jour de la livraison doit d'abord être choisi. */
   function blocCharger(prevus: Partial<Record<CleCalibre, number>>, debut: DateISO, total: number, depuisStock: boolean) {
     if (jour > auj) return <p className="discret">Livraison à venir : vous noterez les plateaux chargés le jour du départ.</p>
-    if (chargement) return <Chargement prevus={prevus} boxesMatin={boxesMatin} du={debut} au={au} depuisStock={depuisStock} onFini={(id) => { setChargement(false); setARepartir(id) }} />
-    if (total <= 0) return null
+    if (chargement) return <Chargement prevus={prevus} matinParCalibre={matinParCalibre} du={debut} au={au} depuisStock={depuisStock} onFini={(id) => { setChargement(false); setARepartir(id) }} />
+    if (total + totalMatinPlateaux * OEUFS_PAR_PLATEAU <= 0) return null
     return (
       <section className="carte" aria-label="Charger et répartir">
         <h2 style={{ marginTop: 0 }}>Charger le bus et répartir</h2>
@@ -254,16 +303,18 @@ export function Ramassage() {
           </p>
           <label style={{ marginBottom: 6 }}>Jour de la livraison<input type="date" value={au} onChange={(e) => e.target.value && setAu(e.target.value)} /></label>
           <JourLivraison au={au} onChange={setAu} />
+          {question}
           <section aria-label="Total à livrer" className="vedette vedette-camion">
             <div>
               <div className="discret">Le bus peut emporter{totalFutur ? ' environ' : ''}</div>
-              <div className="grand">{enPlateaux(totalALivrer)}</div>
-              <div className="calibres-vedette"><LigneCalibres quantites={aLivrer} /></div>
-              {(totalBus > 0 || totalFutur > 0) && (
+              <div className="grand">{enPlateaux(totalALivrer + totalMatinPlateaux * OEUFS_PAR_PLATEAU)}</div>
+              <div className="calibres-vedette"><LigneCalibres quantites={enOeufsAvecMatin(aLivrer)} /></div>
+              {(totalBus > 0 || totalFutur > 0 || totalMatinPlateaux > 0) && (
                 <div className="discret" style={{ fontSize: 13 }}>
                   au magasin {enPlateaux(totalMagasin)}
                   {totalBus > 0 && ` − ${enPlateaux(totalBus)} encore dans le bus (pas encore répartis)`}
                   {totalFutur > 0 && ` + ≈ ${enPlateaux(totalFutur)} ramassés d’ici le départ`}
+                  {totalMatinPlateaux > 0 && ` + ${totalMatinPlateaux} plateau${totalMatinPlateaux > 1 ? 'x' : ''} ramassés ce matin`}
                 </div>
               )}
             </div>
@@ -283,6 +334,7 @@ export function Ramassage() {
         <label>Jour de la livraison<input type="date" value={au} onChange={(e) => e.target.value && setAu(e.target.value)} /></label>
       </div>
       <JourLivraison au={au} onChange={setAu} />
+      {question}
 
       {!periodeValide ? <div className="erreur">Rien à livrer : le ramassage commence le jour de la livraison ou après.</div> : (
         <>
@@ -290,9 +342,9 @@ export function Ramassage() {
             <div>
               <div className="discret">Le bus va emporter{inv.prevus ? ' environ' : ''}</div>
               <div className="discret" style={{ fontSize: 13 }}>ramassage du {formatDate(du)}{du < fin ? ` au ${formatDate(fin)}` : ''}</div>
-              <div className="grand">{enPlateaux(aRamasser)}</div>
-              <div className="variation">{aRamasser} œufs{inv.prevus ? ` · dont ≈ ${inv.prevus} prévus` : ''}</div>
-              {ORDRE_CLES.some((k) => k !== 'autre' && parCal[k]) && <div className="calibres-vedette"><LigneCalibres quantites={parCal} /></div>}
+              <div className="grand">{enPlateaux(aRamasser + totalMatinPlateaux * OEUFS_PAR_PLATEAU)}</div>
+              <div className="variation">{aRamasser} œufs{inv.prevus ? ` · dont ≈ ${inv.prevus} prévus` : ''}{totalMatinPlateaux > 0 ? ` + ${totalMatinPlateaux} plateau${totalMatinPlateaux > 1 ? 'x' : ''} ramassés ce matin` : ''}</div>
+              {ORDRE_CLES.some((k) => k !== 'autre' && parCal[k]) && <div className="calibres-vedette"><LigneCalibres quantites={enOeufsAvecMatin(parCal)} /></div>}
               {emportes > 0 && (
                 <div className="discret" style={{ fontSize: 13 }}>
                   ramassage {enPlateaux(inv.total)} − {enPlateaux(emportes)} déjà partis le matin du {formatDate(du)}

@@ -70,18 +70,46 @@ describe('Ramassage', () => {
     }))
   })
 
-  it('ajoute la collecte du matin au chargement', async () => {
+  it('demande, dès le jour choisi, si le ramassage du matin part : il s’ajoute au total et au chargement', async () => {
     const { u, enregistrer } = afficher()
+    expect(screen.queryByRole('region', { name: 'Ramassage du matin' })).toBeNull()
     fireEvent.change(screen.getByLabelText('Jour de la livraison'), { target: { value: '2026-10-31' } })
+    const question = screen.getByRole('region', { name: 'Ramassage du matin' })
+    expect(question).toHaveTextContent('Le ramassage de ce matin part-il dans le bus ?')
+    expect(within(question).queryByRole('group', { name: 'Ramassés ce matin' })).toBeNull()
+    await u.click(within(question).getByRole('button', { name: 'Oui' }))
+    const matin = within(question).getByRole('group', { name: 'Ramassés ce matin' })
+    // Repère : box 1 pond 300 œufs par jour, soit 10 plateaux.
+    expect(matin).toHaveTextContent('≈ 10/jour')
+    await u.type(within(matin).getByLabelText(/^Box 1 · Non classé/), '12')
+    expect(screen.getByRole('region', { name: 'Total à livrer' })).toHaveTextContent('41 plateaux')
+    expect(screen.getByRole('region', { name: 'Total à livrer' })).toHaveTextContent('+ 12 plateaux ramassés ce matin')
     await u.click(screen.getByRole('button', { name: 'Charger et répartir entre les clients' }))
     const f = screen.getByRole('form', { name: 'Plateaux chargés' })
-    expect(within(f).queryByRole('group', { name: 'Ramassés ce matin' })).toBeNull()
-    await u.click(within(f).getByRole('checkbox', { name: 'Le bus part après le ramassage du matin' }))
-    const matin = within(f).getByRole('group', { name: 'Ramassés ce matin' })
-    await u.type(within(matin).getByLabelText(/^Box 1 · Non classé/), '12')
     expect(f).toHaveTextContent('Total chargé41 plateaux')
     await u.click(within(f).getByRole('button', { name: 'Continuer vers la répartition' }))
     expect(enregistrer).toHaveBeenCalledWith('ramassages', expect.objectContaining({ lignes: [{ numero: 0, calibre: null, theorique: 870, charge: 1230, matin: 360 }] }))
+  })
+
+  it('« Non » ou une livraison demain : rien du matin n’est compté', async () => {
+    const { u } = afficher()
+    fireEvent.change(screen.getByLabelText('Jour de la livraison'), { target: { value: '2026-10-31' } })
+    await u.click(screen.getByRole('button', { name: 'Oui' }))
+    await u.type(screen.getByLabelText(/^Box 1 · Non classé/), '12')
+    await u.click(screen.getByRole('button', { name: 'Non' }))
+    expect(screen.queryByRole('group', { name: 'Ramassés ce matin' })).toBeNull()
+    expect(screen.getByRole('region', { name: 'Total à livrer' })).not.toHaveTextContent('ce matin')
+    await u.click(screen.getByRole('button', { name: 'Demain' }))
+    expect(screen.queryByRole('region', { name: 'Ramassage du matin' })).toBeNull()
+  })
+
+  it('avec le stock suivi, ne pose pas la question si la ponte du jour est déjà saisie', () => {
+    afficher({
+      ponte: [...pontes, ponte('b3', '2026-10-31', { oeufs_collectes: 300 })],
+      reglages: [{ id: 1, boxes: [], stock_depart: { date: '2026-10-30', oeufs: 3000 } }], ramassages: [], transactions: [],
+    })
+    fireEvent.change(screen.getByLabelText('Jour de la livraison'), { target: { value: '2026-10-31' } })
+    expect(screen.queryByRole('region', { name: 'Ramassage du matin' })).toBeNull()
   })
 
   it('au passage suivant, retire ce qui a été emporté le matin', () => {
@@ -213,10 +241,10 @@ describe('Calibres', () => {
     const boxes2 = [1, 2, 3, 4].map((numero) => ({ numero, ouvrier_id: null, calibre: numero === 1 ? ('gros' as const) : numero === 3 ? ('moyen' as const) : null }))
     const { u, enregistrer } = afficher({ reglages: [{ id: 1, boxes: boxes2, stock_depart: { date: '2026-10-30', oeufs: 3000, par_calibre: { gros: 3000 } } }], ramassages: [], transactions: [] })
     fireEvent.change(screen.getByLabelText('Jour de la livraison'), { target: { value: '2026-10-31' } })
+    await u.click(screen.getByRole('button', { name: 'Oui' }))
+    await u.type(within(screen.getByRole('group', { name: 'Ramassés ce matin' })).getByLabelText(/^Box 3 · Moyen/), '8')
     await u.click(screen.getByRole('button', { name: 'Charger et répartir entre les clients' }))
     const f = screen.getByRole('form', { name: 'Plateaux chargés' })
-    await u.click(within(f).getByRole('checkbox', { name: 'Le bus part après le ramassage du matin' }))
-    await u.type(within(within(f).getByRole('group', { name: 'Ramassés ce matin' })).getByLabelText(/^Box 3 · Moyen/), '8')
     expect(f).toHaveTextContent('Total chargé108 plateaux')
     await u.click(within(f).getByRole('button', { name: 'Continuer vers la répartition' }))
     expect(enregistrer).toHaveBeenCalledWith('ramassages', expect.objectContaining({ lignes: [
@@ -233,15 +261,16 @@ describe('Calibres', () => {
   it('charge par calibre, avec la collecte du matin répartie comme la ponte', async () => {
     const { u, enregistrer } = afficher({ reglages })
     fireEvent.change(screen.getByLabelText('Jour de la livraison'), { target: { value: '2026-10-31' } })
+    await u.click(screen.getByRole('button', { name: 'Oui' }))
+    const matin = screen.getByRole('group', { name: 'Ramassés ce matin' })
+    await u.type(within(matin).getByLabelText(/^Box 1 · Gros/), '10')
+    await u.type(within(matin).getByLabelText(/^Box 2 · Petit/), '19')
+    expect(matin).toHaveTextContent('Total du matin : Gros 10Petit 19')
+    expect(screen.getByRole('region', { name: 'Total à livrer' })).toHaveTextContent('Gros 20Petit 38')
     await u.click(screen.getByRole('button', { name: 'Charger et répartir entre les clients' }))
     const f = screen.getByRole('form', { name: 'Plateaux chargés' })
     expect(within(f).getByLabelText(/^Gros/)).toHaveValue('10')
     expect(within(f).getByLabelText(/^Petit/)).toHaveValue('19')
-    await u.click(within(f).getByRole('checkbox', { name: 'Le bus part après le ramassage du matin' }))
-    const matin = within(f).getByRole('group', { name: 'Ramassés ce matin' })
-    await u.type(within(matin).getByLabelText(/^Box 1 · Gros/), '10')
-    await u.type(within(matin).getByLabelText(/^Box 2 · Petit/), '19')
-    expect(matin).toHaveTextContent('Total du matin : Gros 10Petit 19')
     await u.click(within(f).getByRole('button', { name: 'Continuer vers la répartition' }))
     expect(enregistrer).toHaveBeenCalledWith('ramassages', expect.objectContaining({ lignes: [
       { numero: 0, calibre: 'gros', theorique: 300, charge: (10 + 10) * 30, matin: 300 },
