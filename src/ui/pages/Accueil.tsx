@@ -92,7 +92,7 @@ export function Accueil() {
       )}
 
       <section aria-label={`Caisse de ${nomMois}`} className={`vedette${reste < 0 ? ' vedette-perte' : ''}`}>
-        <div className="discret">Caisse de {nomMois}</div>
+        <h2 className="titre-vedette">Caisse de {nomMois}</h2>
         <div className="bilan-mois">
           <span>Réellement encaissé</span><strong data-testid="recettes">{formatFCFA(caisse.entre)}</strong>
           <span>Réellement dépensé</span><strong data-testid="depenses">{caisse.sorti ? `− ${formatFCFA(caisse.sorti)}` : formatFCFA(0)}</strong>

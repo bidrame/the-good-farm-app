@@ -133,6 +133,8 @@ a.retour { display: inline-flex; align-items: center; min-height: 44px; padding-
 .vedette .variation { color: var(--accent-vedette); font-weight: 700; font-size: 14px; }
 .vedette.vedette-perte { background: var(--perte); color: var(--sur-perte); }
 .vedette.vedette-perte .variation { color: var(--accent-perte); }
+.vedette .titre-vedette { margin: 0 0 8px; padding-bottom: 8px; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; color: inherit; border-bottom: 2px solid color-mix(in srgb, currentColor 55%, transparent); }
+.vedette .titre-vedette::first-letter { text-transform: uppercase; }
 .vedette .bilan-mois { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 2px 12px; margin: 6px 0 4px; font-size: 16px; }
 .vedette .bilan-mois strong { text-align: right; font-variant-numeric: tabular-nums; }
 .vedette .bilan-mois .trait { grid-column: 1 / -1; border-top: 1px solid color-mix(in srgb, currentColor 40%, transparent); margin: 4px 0 2px; }
