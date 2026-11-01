@@ -1,13 +1,15 @@
 import { formatFCFA } from '../format'
 import type { Client, DateISO, Paiement, Transaction } from '../types'
 
-export function validerTransaction(t: Partial<Transaction>, ref: DateISO): Record<string, string> {
+/** `aliment` : l'achat d'aliment a toujours un fournisseur, payé ou non, pour suivre ce qu'on lui doit. */
+export function validerTransaction(t: Partial<Transaction>, ref: DateISO, { aliment = false }: { aliment?: boolean } = {}): Record<string, string> {
   const e: Record<string, string> = {}
   if (!t.date) e.date = 'Date obligatoire'
   else if (t.date > ref) e.date = 'Date dans le futur'
   if (!t.produit_id) e.produit_id = 'Produit obligatoire'
   if (t.type === 'vente' && !t.client_id) e.client_id = 'Client obligatoire'
-  if (t.type === 'depense' && !t.client_id && t.montant != null && (t.montant_paye ?? 0) < t.montant)
+  if (t.type === 'depense' && !t.client_id && aliment) e.client_id = 'Fournisseur obligatoire pour l’aliment'
+  else if (t.type === 'depense' && !t.client_id && t.montant != null && (t.montant_paye ?? 0) < t.montant)
     e.client_id = 'Fournisseur obligatoire si tout n’est pas payé'
   if (!t.quantite || t.quantite <= 0) e.quantite = 'Quantité obligatoire'
   if (!t.prix_unitaire || t.prix_unitaire <= 0) e.prix_unitaire = 'Prix obligatoire'

@@ -7,6 +7,7 @@ import { CONDITIONNEMENTS_DEFAUT, OEUFS_PAR_PLATEAU, enOeufs } from '../../lib/c
 import { COURBE_DEFAUT } from '../../lib/calculs/ponte'
 import { CALIBRES, NOM_CALIBRE } from '../../lib/calculs/calibres'
 import { bandesEnProduction } from '../../lib/calculs/bandes'
+import { produitsDirects } from '../../lib/calculs/bilans'
 import { moyenneOeufs7 } from '../../lib/calculs/suiviOeufs'
 import { aujourdhui, formatDate } from '../../lib/format'
 import { BoxesEtOuvriers } from '../composants/BoxesEtOuvriers'
@@ -195,6 +196,30 @@ function SeuilsAlerte() {
   )
 }
 
+/** Dépenses retirées des ventes pour la marge brute de l'accueil. */
+function CoutsDirects() {
+  const { produits, reglages, enregistrer } = useDonnees()
+  const directs = produitsDirects(produits, reglages[0]?.couts_directs)
+  const depenses = produits.filter((p) => p.type === 'depense' && !p.supprime_le && (p.actif || directs.includes(p.id))).sort((a, b) => a.nom.localeCompare(b.nom))
+  const basculer = (id: string, coche: boolean) =>
+    enregistrer('reglages', { id: 1, couts_directs: coche ? [...directs, id] : directs.filter((x) => x !== id) })
+  return (
+    <section className="sous-rubrique" aria-label="Coûts directs">
+      <h3>Coûts directs (marge brute)</h3>
+      <p className="discret" style={{ marginTop: 0 }}>
+        Cochez les dépenses qui suivent la production (aliment, vaccins, alvéoles…). L’accueil affiche la marge brute : ventes du mois moins ces dépenses.
+      </p>
+      {depenses.length === 0 && <p className="discret">Aucun produit de dépense pour l’instant.</p>}
+      {depenses.map((p) => (
+        <label key={p.id} className="case">
+          <input type="checkbox" checked={directs.includes(p.id)} onChange={(e) => basculer(p.id, e.target.checked)} />
+          <span>{p.nom}</span>
+        </label>
+      ))}
+    </section>
+  )
+}
+
 function Conditionnements() {
   const { reglages, enregistrer } = useDonnees()
   const liste: Conditionnement[] = reglages[0]?.conditionnements?.length ? reglages[0].conditionnements : CONDITIONNEMENTS_DEFAUT
@@ -303,6 +328,7 @@ export function Reglages() {
         <Produits />
         <Conditionnements />
         <Inventaire />
+        <CoutsDirects />
       </Rubrique>
       <Rubrique genre="ouvrier" titre="Mes boxes et ouvriers">
         <BoxesEtOuvriers />

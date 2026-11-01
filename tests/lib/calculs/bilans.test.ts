@@ -1,4 +1,4 @@
-import { bilanMensuel, bilanAnnuel, parProduit, classementClients } from '../../../src/lib/calculs/bilans'
+import { bilanMensuel, bilanAnnuel, parProduit, classementClients, margeBruteMois, produitsDirects } from '../../../src/lib/calculs/bilans'
 import { tx, client, produit } from '../../fixtures/tx'
 
 describe('bilanMensuel', () => {
@@ -54,5 +54,25 @@ describe('Trésorerie du mois', () => {
       { id: 'p2', client_id: 'f', sens: 'fournisseur' as const, date: '2026-10-12', montant: 30000, mode: 'especes' as const },
     ]
     expect(tresorerieMois(txs, paiements, '2026-10')).toEqual({ entre: 65000, sorti: 30000 })
+  })
+})
+
+describe('marge brute', () => {
+  const produits = [produit('a', 'Aliment pondeuse', 'depense'), produit('v', 'Vaccins', 'depense'), produit('s', 'Salaires', 'depense'), produit('o', 'Œufs', 'vente')]
+  it('reconnaît d’office les coûts directs par leur nom, sauf réglage', () => {
+    expect(produitsDirects(produits)).toEqual(['a', 'v'])
+    expect(produitsDirects(produits, ['s'])).toEqual(['s'])
+    expect(produitsDirects(produits, [])).toEqual([])
+  })
+  it('retire des ventes du mois les seuls coûts directs du mois', () => {
+    const txs = [
+      tx({ date: '2026-10-02', prix_unitaire: 1000 }),
+      tx({ date: '2026-10-03', type: 'depense', produit_id: 'a', prix_unitaire: 300 }),
+      tx({ date: '2026-10-04', type: 'depense', produit_id: 's', prix_unitaire: 500 }),
+      tx({ date: '2026-09-30', type: 'depense', produit_id: 'a', prix_unitaire: 900 }),
+      tx({ date: '2026-10-05', type: 'depense', produit_id: 'a', prix_unitaire: 100, supprime_le: '2026-10-06' }),
+    ]
+    expect(margeBruteMois(txs, '2026-10', ['a'])).toEqual({ couts: 300, marge: 700, taux: 0.7 })
+    expect(margeBruteMois([], '2026-10', ['a'])).toEqual({ couts: 0, marge: 0, taux: null })
   })
 })

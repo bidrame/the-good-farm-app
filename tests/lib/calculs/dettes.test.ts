@@ -1,4 +1,4 @@
-import { detteFournisseur, dettesFournisseurs, argentSorti } from '../../../src/lib/calculs/dettes'
+import { detteFournisseur, dettesFournisseurs, argentSorti, resteSansFournisseur } from '../../../src/lib/calculs/dettes'
 import { soldeClient, validerTransaction } from '../../../src/lib/calculs/credits'
 import { calculerAlertes } from '../../../src/lib/calculs/alertes'
 import { client, paiement, tx } from '../../fixtures/tx'
@@ -11,6 +11,10 @@ describe('validerTransaction (dépense)', () => {
   it('exige un fournisseur quand tout n’est pas payé', () => {
     expect(validerTransaction({ ...base, client_id: null, montant_paye: 0 }, '2026-10-31').client_id).toBe('Fournisseur obligatoire si tout n’est pas payé')
     expect(validerTransaction({ ...base, client_id: null, montant_paye: 1000 }, '2026-10-31')).toEqual({})
+  })
+  it('exige toujours un fournisseur pour l’aliment, même payé', () => {
+    expect(validerTransaction({ ...base, client_id: null, montant_paye: 1000 }, '2026-10-31', { aliment: true }).client_id).toBe('Fournisseur obligatoire pour l’aliment')
+    expect(validerTransaction({ ...base, client_id: 'f1', montant_paye: 1000 }, '2026-10-31', { aliment: true })).toEqual({})
   })
   it('refuse de payer plus que le montant', () => {
     expect(validerTransaction({ ...base, client_id: 'f1', montant_paye: 2000 }, '2026-10-31').montant_paye).toMatch(/ne peut pas dépasser/)
@@ -72,5 +76,18 @@ describe('alerte de dette ancienne', () => {
     const a = calculerAlertes({ ...base, dettes: dettesFournisseurs(fournisseurs, txs, [], '2026-10-31').lignes })
     expect(a.map((x) => [x.code, x.message.replace(/\s/g, ' ')])).toEqual([['dette_ancienne', 'Senelec : 20 000 F à payer depuis 46 jours']])
     expect(calculerAlertes({ ...base, dettes: dettesFournisseurs(fournisseurs, txs, [], '2026-10-31').lignes, seuils: { jours_dette: 60 } })).toEqual([])
+  })
+})
+
+describe('resteSansFournisseur', () => {
+  it('additionne le reste à payer des dépenses sans fournisseur, sans les supprimées', () => {
+    const txs = [
+      tx({ type: 'depense', client_id: null, prix_unitaire: 60000 }),
+      tx({ type: 'depense', client_id: null, prix_unitaire: 10000, montant_paye: 4000 }),
+      tx({ type: 'depense', client_id: 'f1', prix_unitaire: 5000 }),
+      tx({ type: 'depense', client_id: null, prix_unitaire: 9000, supprime_le: '2026-10-30' }),
+      tx({ client_id: null, prix_unitaire: 1000, montant_paye: 0 }),
+    ]
+    expect(resteSansFournisseur(txs)).toBe(66000)
   })
 })

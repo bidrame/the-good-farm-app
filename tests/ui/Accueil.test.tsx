@@ -24,15 +24,17 @@ function afficher(heure = 10, enAttente = 0, stock?: { date: string; oeufs: numb
   )
 }
 
-const carte = (libelle: string) => screen.getByText(libelle).closest('.metrique')!
+const carte = (libelle: string) => screen.getAllByText(libelle).map((e) => e.closest('.metrique')).find(Boolean)!
 
 beforeEach(() => vi.useFakeTimers({ toFake: ['Date'] }))
 afterEach(() => vi.useRealTimers())
 
 describe('Accueil', () => {
   it('montre une perte en rouge et dit si les montants montent ou baissent', () => {
-    afficher(10, 0, undefined, [tx({ id: 'grosse-dep', date: '2026-10-20', type: 'depense', client_id: null, produit_id: 'p-alim', prix_unitaire: 200000 })])
+    afficher(10, 0, undefined, [tx({ id: 'grosse-dep', date: '2026-10-20', type: 'depense', client_id: null, produit_id: 'p-alim', prix_unitaire: 200000, montant_paye: 200000 })])
+    // 68 500 F encaissés − 200 000 F payés : la caisse est en perte, avec le signe moins.
     expect(screen.getByTestId('resultat').closest('.vedette')).toHaveClass('vedette-perte')
+    expect(esp(screen.getByTestId('resultat').textContent)).toBe('-131 500 F')
     expect(esp(carte('Ventes').textContent)).toContain('▲ 59 % de plus')
   })
 
@@ -47,15 +49,39 @@ describe('Accueil', () => {
     expect(esp(carte('Ventes').textContent)).toContain('▲ 59 %')
     expect(esp(carte('Dépenses').textContent)).toContain('60 000 F')
     expect(carte('Dépenses').querySelector('.mauvais')).toHaveTextContent('▲') // des dépenses en hausse, c'est en rouge
-    expect(esp(screen.getByTestId('resultat').textContent)).toContain('19 500 F')
-    expect(esp(screen.getByText(/par rapport à septembre/).textContent)).toBe('▲ +9 500 F par rapport à septembre')
+  })
+
+  it('la pastille part de l’argent réellement encaissé et dépensé dans le mois', () => {
+    afficher()
+    // Octobre : 79 500 F vendus dont 11 000 F à crédit, aliment de 60 000 F pas encore payé.
+    const pastille = screen.getByRole('region', { name: 'Caisse de octobre' })
+    expect(esp(screen.getByTestId('recettes').textContent)).toBe('68 500 F')
+    expect(esp(screen.getByTestId('depenses').textContent)).toBe('0 F')
+    expect(esp(screen.getByTestId('resultat').textContent)).toBe('68 500 F')
+    expect(pastille).toHaveTextContent('Réellement encaissé')
+    expect(pastille).toHaveTextContent('Réellement dépensé')
+    // Ce qui reste dehors : le crédit de 11 000 F, les aliments d’octobre (60 000 F) et de septembre (40 000 F), saisis sans fournisseur et pas payés.
+    expect(esp(screen.getByTestId('non-encaisse').textContent)).toBe('11 000 F')
+    expect(esp(screen.getByTestId('dettes').textContent)).toBe('100 000 F')
+    // Septembre : 50 000 F encaissés.
+    expect(esp(screen.getByText(/par rapport à septembre/).textContent)).toBe('▲ +18 500 F par rapport à septembre')
     expect(esp(carte('Crédits dus').textContent)).toContain('11 000 F')
   })
 
-  it('sous le résultat, montre l’argent réellement entré et sorti et ce qu’il reste à payer', () => {
+  it('sous le résultat, montre la marge brute : ventes moins les coûts directs (l’aliment d’office)', () => {
+    afficher(10, 0, undefined, [tx({ id: 'sal', date: '2026-10-28', type: 'depense', client_id: null, produit_id: 'p-sal', prix_unitaire: 10000 })])
+    // Ventes 79 500 − aliment 60 000 ; les salaires ne comptent pas.
+    expect(esp(screen.getByTestId('marge-brute').textContent)).toBe('Marge brute : 19 500 F · 25 % des ventes')
+  })
+
+  it('sans pourcentage quand les coûts directs dépassent le double des ventes', () => {
+    afficher(10, 0, undefined, [tx({ id: 'alim', date: '2026-10-28', type: 'depense', client_id: null, produit_id: 'p-alim', prix_unitaire: 200000 })])
+    expect(esp(screen.getByTestId('marge-brute').textContent)).toBe('Marge brute : -180 500 F')
+  })
+
+  it('sous la pastille, rappelle les ventes et dépenses du mois, payées ou non', () => {
     afficher()
-    const ligne = screen.getByLabelText('Trésorerie du mois')
-    expect(ligne).toHaveTextContent(/Argent réellement entré : .+ · sorti : .+ · encore à payer aux fournisseurs : /)
+    expect(esp(screen.getByLabelText('Ventes et dépenses du mois').textContent)).toBe('Ventes du mois, payées ou non : 79 500 F · dépenses : 60 000 F · résultat : 19 500 F')
   })
   it('range les alertes : une cloche avec leur nombre et un seul bandeau, la plus grave d’abord', () => {
     afficher(19)

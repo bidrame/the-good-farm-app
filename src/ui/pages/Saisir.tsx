@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useDonnees } from '../../data/useDonnees'
+import { produitsAliment } from '../../lib/calculs/aliment'
 import { dernierPrix, validerTransaction } from '../../lib/calculs/credits'
 import { estDoublonTransaction } from '../../lib/calculs/doublons'
 import { CONDITIONNEMENTS_DEFAUT, OEUFS_PAR_PLATEAU, estProduitOeufs } from '../../lib/calculs/oeufs'
@@ -98,6 +99,9 @@ export function Saisir() {
     choisirClient(id)
   }
 
+  // L'aliment a toujours un fournisseur : on sait ainsi qui attend encore son argent.
+  const aliment = f.type === 'depense' && !!f.produit_id && produitsAliment(produits, reglages[0]?.aliment).includes(f.produit_id)
+
   function construire(): Transaction {
     return {
       id: f.id, date: f.date, type: f.type, client_id: f.client_id, produit_id: f.produit_id ?? '',
@@ -108,7 +112,7 @@ export function Saisir() {
 
   function continuer(forcer = false) {
     const t = construire()
-    const e = validerTransaction(t, aujourdhui())
+    const e = validerTransaction(t, aujourdhui(), { aliment })
     setErreurs(e)
     if (Object.keys(e).length > 0) return
     if (!forcer && estDoublonTransaction(t, transactions)) return setDoublon(true)
@@ -190,7 +194,7 @@ export function Saisir() {
       </label>
 
       <ChampClient
-        libelle={f.type === 'vente' ? 'Client' : f.paye === 'tout' ? 'Fournisseur (facultatif)' : 'Fournisseur'}
+        libelle={f.type === 'vente' ? 'Client' : f.paye === 'tout' && !aliment ? 'Fournisseur (facultatif)' : 'Fournisseur'}
         clients={clients}
         valeur={f.client_id}
         onChange={choisirClient}

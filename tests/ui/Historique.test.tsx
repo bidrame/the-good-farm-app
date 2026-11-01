@@ -134,6 +134,17 @@ describe('Réglages', () => {
   })
 })
 
+describe('Réglages : coûts directs', () => {
+  it('coche d’office l’aliment, pas les salaires, et enregistre la liste quand on coche', async () => {
+    const { u, enregistrer } = afficher(<Reglages />)
+    const liste = screen.getByRole('region', { name: 'Coûts directs' })
+    expect(within(liste).getByRole('checkbox', { name: 'Aliment pondeuse' })).toBeChecked()
+    expect(within(liste).getByRole('checkbox', { name: 'Salaires' })).not.toBeChecked()
+    await u.click(within(liste).getByRole('checkbox', { name: 'Salaires' }))
+    expect(enregistrer).toHaveBeenCalledWith('reglages', { id: 1, couts_directs: ['p-alim', 'p-sal'] })
+  })
+})
+
 describe('Réglages : unités et seuils', () => {
   it('change l’unité d’un produit', async () => {
     const { u, enregistrer } = afficher(<Reglages />)

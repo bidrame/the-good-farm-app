@@ -63,3 +63,20 @@ export function classementClients(txs: Transaction[], clients: Client[]) {
     .filter((l) => l.nb > 0)
     .sort((a, b) => b.ca - a.ca)
 }
+
+/** Dépenses qui suivent la production : aliment, santé des volailles, alvéoles, poussins. */
+const DIRECTS = /aliment|provende|vaccin|m[ée]dic|v[ée]t[ée]?o|alv[ée]ole|poussin|poulette/i
+
+/** Produits de dépense comptés comme coûts directs : le réglage s'il existe, sinon ceux reconnus par leur nom. */
+export function produitsDirects(produits: Produit[], reglage?: string[] | null): string[] {
+  if (reglage) return reglage
+  return produits.filter((p) => p.type === 'depense' && DIRECTS.test(p.nom)).map((p) => p.id)
+}
+
+/** Marge brute du mois `AAAA-MM` : ventes moins les dépenses de coûts directs ; `taux` en part des ventes. */
+export function margeBruteMois(txs: Transaction[], mois: string, directs: string[]): { couts: number; marge: number; taux: number | null } {
+  const duMois = txs.filter((t) => !t.supprime_le && t.date.startsWith(mois))
+  const ventes = duMois.filter((t) => t.type === 'vente').reduce((s, t) => s + t.montant, 0)
+  const couts = duMois.filter((t) => t.type === 'depense' && t.produit_id && directs.includes(t.produit_id)).reduce((s, t) => s + t.montant, 0)
+  return { couts, marge: ventes - couts, taux: ventes ? (ventes - couts) / ventes : null }
+}

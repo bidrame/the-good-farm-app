@@ -4,9 +4,9 @@ import { useDonnees } from '../../data/useDonnees'
 import { etatAliment, JOURS_ALERTE_ALIMENT } from '../../lib/calculs/aliment'
 import { boxesFerme } from '../../lib/calculs/boxes'
 import { CALIBRES, nomCle, ORDRE_CLES, stockParCalibre } from '../../lib/calculs/calibres'
-import { bilanMensuel, tresorerieMois } from '../../lib/calculs/bilans'
+import { bilanMensuel, margeBruteMois, produitsDirects, tresorerieMois } from '../../lib/calculs/bilans'
 import { soldesClients } from '../../lib/calculs/credits'
-import { dettesFournisseurs } from '../../lib/calculs/dettes'
+import { dettesFournisseurs, resteSansFournisseur } from '../../lib/calculs/dettes'
 import { OEUFS_PAR_PLATEAU, decomposer, stockOeufs } from '../../lib/calculs/oeufs'
 import { aujourdhui, formatFCFA } from '../../lib/format'
 import { Compteur } from '../composants/animations'
@@ -39,9 +39,16 @@ export function Accueil() {
   const avant = bilan.find((l) => l.periode === moisPrecedent(mois))
   const credits = soldesClients(clients, transactions, paiements).filter((s) => s.solde > 0).reduce((t, s) => t + s.solde, 0)
   const dettes = dettesFournisseurs(clients, transactions, paiements, ref)
+  // Tout ce qui reste à payer : dettes fournisseurs et dépenses saisies sans fournisseur pas encore réglées.
+  const aPayer = dettes.total + resteSansFournisseur(transactions)
+  // La pastille part de l'argent réellement encaissé et décaissé dans le mois (ventes et dettes payées comprises).
   const caisse = tresorerieMois(transactions, paiements, mois)
-  // Écart en francs : un pourcentage n'a pas de sens quand le résultat est négatif.
-  const ecartResultat = avant ? ce.resultat - avant.resultat : null
+  const reste = caisse.entre - caisse.sorti
+  const caisseAvant = tresorerieMois(transactions, paiements, moisPrecedent(mois))
+  const resteAvant = caisseAvant.entre - caisseAvant.sorti
+  const marge = margeBruteMois(transactions, mois, produitsDirects(produits, r?.couts_directs))
+  // Écart en francs : un pourcentage n'a pas de sens quand le reste est négatif.
+  const ecartReste = caisseAvant.entre || caisseAvant.sorti ? reste - resteAvant : null
   const nomMoisPrecedent = NOMS_MOIS[Number(moisPrecedent(mois).slice(5)) - 1]
 
   const stock = r?.stock_depart ? decomposer(Math.max(0, stockOeufs({ pontes: ponte, transactions, produits, depart: r.stock_depart })), OEUFS_PAR_PLATEAU) : null
@@ -84,17 +91,34 @@ export function Accueil() {
         </Link>
       )}
 
-      <div className={`vedette${ce.resultat < 0 ? ' vedette-perte' : ''}`}>
-        <div className="discret">Résultat de {nomMois}</div>
-        <div className="grand" data-testid="resultat"><Compteur valeur={ce.resultat} format={formatFCFA} /></div>
-        {ecartResultat != null && (
-          <div className="variation">{ecartResultat >= 0 ? `▲ +${formatFCFA(ecartResultat)}` : `▼ ${formatFCFA(ecartResultat)}`} par rapport à {nomMoisPrecedent}</div>
+      <section aria-label={`Caisse de ${nomMois}`} className={`vedette${reste < 0 ? ' vedette-perte' : ''}`}>
+        <div className="discret">Caisse de {nomMois}</div>
+        <div className="bilan-mois">
+          <span>Réellement encaissé</span><strong data-testid="recettes">{formatFCFA(caisse.entre)}</strong>
+          <span>Réellement dépensé</span><strong data-testid="depenses">{caisse.sorti ? `− ${formatFCFA(caisse.sorti)}` : formatFCFA(0)}</strong>
+          <span className="trait" aria-hidden="true" />
+          <span className="reste">Il reste</span>
+          <span className="grand" data-testid="resultat"><Compteur valeur={reste} format={formatFCFA} /></span>
+        </div>
+        {ecartReste != null && (
+          <div className="variation">{ecartReste >= 0 ? `▲ +${formatFCFA(ecartReste)}` : `▼ ${formatFCFA(ecartReste)}`} par rapport à {nomMoisPrecedent}</div>
         )}
-      </div>
-      <p className="tresorerie" aria-label="Trésorerie du mois">
-        Argent réellement entré : <strong className="entree">{formatFCFA(caisse.entre)}</strong>
-        {' · '}sorti : <strong className="sortie">{formatFCFA(caisse.sorti)}</strong>
-        {' · '}encore à payer aux fournisseurs : <strong className={dettes.total > 0 ? 'du' : ''}>{formatFCFA(dettes.total)}</strong>
+        <div className="bilan-mois dehors">
+          <span>Non encaissé<span className="precision">livraisons non payées</span></span><strong data-testid="non-encaisse">{formatFCFA(credits)}</strong>
+          <span>Dettes<span className="precision">pas encore payé (aliment…)</span></span><strong data-testid="dettes">{formatFCFA(aPayer)}</strong>
+        </div>
+        {marge.taux != null && (
+          <div className="marge-brute" data-testid="marge-brute">
+            Marge brute : <strong>{formatFCFA(marge.marge)}</strong>
+            {/* Avec peu de ventes (début de mois), un pourcentage comme −1 200 % n'apprend rien. */}
+            {marge.taux >= -1 && ` · ${Math.round(marge.taux * 100)} % des ventes`}
+          </div>
+        )}
+      </section>
+      <p className="tresorerie" aria-label="Ventes et dépenses du mois">
+        Ventes du mois, payées ou non : <strong>{formatFCFA(ce.ventes)}</strong>
+        {' · '}dépenses : <strong>{formatFCFA(ce.depenses)}</strong>
+        {' · '}résultat : <strong className={ce.resultat < 0 ? 'sortie' : 'entree'}>{formatFCFA(ce.resultat)}</strong>
       </p>
 
       {premiere && (

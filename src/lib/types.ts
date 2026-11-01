@@ -194,4 +194,6 @@ export interface Reglages {
   aliment?: ReglagesAliment | null
   /** Produits de dépense exclus du prix de revient des œufs. */
   couts_exclus?: string[] | null
+  /** Produits de dépense comptés comme coûts directs dans la marge brute. */
+  couts_directs?: string[] | null
 }

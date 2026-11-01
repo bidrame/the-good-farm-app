@@ -41,3 +41,8 @@ export function argentSorti(txs: Transaction[], paiements: Paiement[], periode: 
   const verses = paiements.filter((p) => estPaiementFournisseur(p) && p.date.startsWith(periode)).reduce((s, p) => s + p.montant, 0)
   return comptant + verses
 }
+
+/** Reste à payer des dépenses saisies sans fournisseur (aliment acheté « à payer plus tard »…). */
+export function resteSansFournisseur(txs: Transaction[]): number {
+  return txs.filter((t) => t.type === 'depense' && !t.client_id && !t.supprime_le).reduce((s, t) => s + Math.max(0, t.montant - t.montant_paye), 0)
+}
