@@ -4,10 +4,12 @@ import { lireClasseur } from '../../scripts/import/lireClasseur'
 import { construireImport, totauxParAnnee } from '../../scripts/import/construireImport'
 
 const CLASSEUR = 'tests/fixtures/classeur.xlsx'
+const PRESENT = existsSync(CLASSEUR) && existsSync('tests/fixtures/totaux-attendus.json')
 
 // Le vrai classeur n'est jamais commité (données de la ferme) : ces tests ne tournent qu'en local.
-describe.skipIf(!existsSync(CLASSEUR) || !existsSync('tests/fixtures/totaux-attendus.json'))('reprise du vrai classeur', () => {
-  const lu = lireClasseur(CLASSEUR)
+describe.skipIf(!PRESENT)('reprise du vrai classeur', () => {
+  // Le corps d’un describe ignoré est quand même exécuté pour collecter les tests.
+  const lu = PRESENT ? lireClasseur(CLASSEUR) : (undefined as never)
 
   it('lit 1 788 transactions du 26/09/2023 au 29/10/2026 et met de côté les 4 lignes sans montant', () => {
     expect(lu.transactions).toHaveLength(1788)
